@@ -12,6 +12,48 @@ Shared contract update: form-check IDs and counts now follow the selected exerci
 criteria in `shared/exercise-criteria.ts`; server validation and the browser checklist
 use that same catalogue. Person A and Person B should use these shared definitions.
 
+## Pulldown grip check update
+
+Person A / Person B handoff: `lat_pulldown-2` adds `even_grip_pull` to
+[contracts](../shared/contracts.ts) and the shared criteria. New pulldown reports
+require four checks. The provider schema and browser checklist consume these
+shared definitions; release the UI and server together and reanalyse older
+pulldown reports. Other exercises retain their existing criteria.
+
+The new check covers visibly unequal hand spacing or uneven pulling, with at
+least two submitted evidence moments. Both hands and relevant bar landmarks must
+be visible; perspective, camera roll, curved bars and equipment asymmetry must
+not become false corrections. Uncertain comparisons stay unclear. The
+[NSCA strength and conditioning manual](https://www.nsca.com/contentassets/116c55d64e1343d2b264e05aaf158a91/basics_of_strength_and_conditioning_manual.pdf)
+supports even hand placement; the visual comparison remains an app heuristic,
+not a validated measurement. Mocked tests verify prompt delivery, evidence and
+checklist integration, not detection accuracy on real clips.
+
+## Leg-extension completion check update
+
+Person A / Person B handoff: `leg_extension-3` adds `full_extension` to
+[contracts](../shared/contracts.ts) and the shared catalogue. New leg-extension
+reports require four checks. The checklist distinguishes range completion from
+smooth movement. For `needs_attention`, the completion check requires three
+submitted evidence moments showing lift, visibly bent-knee top, and return;
+missing endpoints or an obstructed view remain unclear. It never requires
+hyperextension or a precise measured knee angle. This follows the full
+straightening instruction in the [PureGym guide](https://www.puregym.com/exercises/legs/quad-exercises/leg-extensions/).
+Deploy UI and server together and reanalyse older leg-extension reports.
+Mocked checks cover schema, prompt delivery and rendering; real-clip accuracy
+remains to be verified.
+
+## Squat-depth check update
+
+Person A / Person B handoff: `dumbbell_front_squat-3` adds `squat_depth` to the
+shared contract and catalogue, making five squat checks. The full-rep reference
+uses thighs approximately parallel, following the linked ACE/NASM resources;
+it does not estimate a 90-degree knee angle or require forced depth. A short-rep
+finding needs at least three submitted moments establishing descent, a clearly
+shallow turnaround, and ascent. Missing endpoints or unclear perspective remain
+unclear. Release UI/server together and reanalyse older squat reports.
+This update does not change curl analysis.
+
 ## Shared interfaces and ownership
 
 - [contracts](../shared/contracts.ts) exports `ExerciseId` from the four-value Zod
@@ -31,6 +73,13 @@ use that same catalogue. Person A and Person B should use these shared definitio
   report via the existing typed interface. No dependencies or model IDs changed.
 
 ## Reference review
+
+See the [expanded technique resource review](TECHNIQUE_REVIEW.md) for additional
+instructions and demonstrations, source-to-criterion mapping, and differences
+that must not become rigid grading rules. The update adds `squat_posture` to the
+shared contract (now five squat checks, including `squat_depth`) and expands leg-extension seat-contact
+checks. Person A and Person B should release the shared catalogue together.
+
 
 Technique sources checked 2026-09-13:
 

@@ -12,7 +12,7 @@ export const LIMITS = {
 } as const;
 
 export const ExerciseIdSchema = z.enum(['dumbbell_curl', 'lat_pulldown', 'leg_extension', 'dumbbell_front_squat']);
-export const FormCriterionIdSchema = z.enum(['steady_upper_arm', 'neutral_wrist', 'steady_torso', 'relaxed_shoulders', 'controlled_movement', 'stable_torso', 'front_pull', 'controlled_return', 'machine_alignment', 'supported_torso', 'smooth_extension', 'front_rack', 'grounded_feet', 'knee_tracking']);
+export const FormCriterionIdSchema = z.enum(['steady_upper_arm', 'neutral_wrist', 'steady_torso', 'relaxed_shoulders', 'controlled_movement', 'stable_torso', 'front_pull', 'even_grip_pull', 'controlled_return', 'machine_alignment', 'supported_torso', 'full_extension', 'smooth_extension', 'front_rack', 'squat_depth', 'squat_posture', 'grounded_feet', 'knee_tracking']);
 export const FormStatusSchema = z.enum(['looks_consistent', 'needs_attention', 'unclear']);
 const Seconds = z.number().finite().min(0).max(LIMITS.clipSeconds);
 const Id = z.string().min(1).max(100);
@@ -86,7 +86,7 @@ export const AnalysisReportSchema = z.object({
     ctx.addIssue({ code: 'custom', path: ['formChecks'], message: 'Assess each form criterion exactly once.' });
   }
   for (const check of report.formChecks ?? []) {
-    const minimum = check.status === 'unclear' ? 0 : check.criterionId === 'neutral_wrist' ? 1 : 2;
+    const minimum = check.status === 'unclear' ? 0 : check.criterionId === 'neutral_wrist' ? 1 : (check.criterionId === 'full_extension' || check.criterionId === 'squat_depth') && check.status === 'needs_attention' ? 3 : 2;
     if ((!report.visibility.assessable && check.status !== 'unclear') || new Set(check.evidence.map(e => e.frameIndex)).size < minimum) {
       ctx.addIssue({ code: 'custom', path: ['formChecks'], message: 'An assessed result requires visible supporting evidence.' });
     }

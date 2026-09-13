@@ -58,6 +58,51 @@ test('a legitimate visibility limitation returns zero corrections', async t => {
   const report = await analyzeClip(request, { OPENAI_API_KEY: 'test' });
   assert.equal(report.visibility.assessable, false); assert.deepEqual(report.corrections, []);
 });
+test('combined curl movement receives partial-assessment instructions and preserves supported checks', async t => {
+  const value = {
+    ...structuredClone(draft),
+    summary: 'Synthetic combined squat-and-curl response for this test.',
+    visibility: { assessable: true, limitations: ['Movement control is unclear during the combined movement.'] },
+    corrections: [],
+  };
+  value.formChecks[1] = { criterionId: 'neutral_wrist', status: 'looks_consistent', note: 'The wrist appears aligned during the curl.', evidence: [{ frameIndex: 1 }] };
+  t.mock.method(globalThis, 'fetch', async (_url: string, init: RequestInit) => {
+    const { instructions } = JSON.parse(init.body as string);
+    assert.match(instructions, /Extra movement alone is not an exercise mismatch/);
+    assert.match(instructions, /a squat combined with a curl must not by themselves make the clip unassessable/);
+    assert.match(instructions, /A dumbbell merely held at shoulder height during a squat does not establish a curl/);
+    assert.match(instructions, /do not assume the user intended a squat-curl variation/);
+    assert.match(instructions, /mark steady_torso as needs_attention and include a correction/);
+    assert.match(instructions, /Knee bending alone, camera motion/);
+    assert.match(instructions, /no selected criterion has sufficient visible evidence/);
+    return Response.json(envelope(value));
+  });
+  const report = await analyzeClip(request, { OPENAI_API_KEY: 'test' });
+  assert.equal(report.visibility.assessable, true);
+  assert.equal(report.formChecks?.[1].status, 'looks_consistent');
+  assert.deepEqual(report.formChecks?.[1].evidence.map(item => item.timestampSec), [3]);
+  assert.equal(report.formChecks?.[0].status, 'unclear');
+  assert.deepEqual(report.visibility.limitations, value.visibility.limitations);
+  assert.deepEqual(report.corrections, []);
+});
+test('a visible curl with torso lowering and rising can return an evidence-backed torso correction', async t => {
+  const value = structuredClone(draft);
+  value.summary = 'Synthetic torso-control deviation during a curl.';
+  value.formChecks[2] = { criterionId: 'steady_torso', status: 'needs_attention', note: 'Your hips and torso lower then rise during the curl.', evidence: [{ frameIndex: 0 }, { frameIndex: 2 }] };
+  value.corrections = [{
+    title: 'Keep your torso steady', priority: 'focus_first',
+    observation: 'Your hips and torso lower then rise as you curl the dumbbells.',
+    cue: 'Keep your torso steady as the weight rises.', referenceCue: 'Keep the torso steady through the curl.',
+    evidence: [{ frameIndex: 0, region: null }, { frameIndex: 2, region: null }],
+  }];
+  t.mock.method(globalThis, 'fetch', async () => Response.json(envelope(value)));
+  const report = await analyzeClip(request, { OPENAI_API_KEY: 'test' });
+  assert.equal(report.visibility.assessable, true);
+  assert.equal(report.formChecks?.find(check => check.criterionId === 'steady_torso')?.status, 'needs_attention');
+  assert.equal(report.corrections.length, 1);
+  assert.equal(report.corrections[0].cue, value.corrections[0].cue);
+  assert.deepEqual(report.corrections[0].evidence.map(item => item.timestampSec), [0, 7]);
+});
 test('checklist evidence is mapped to seconds and unsupported positive results are rejected', async t => {
   const value = structuredClone(draft);
   value.formChecks[0] = { criterionId: 'steady_upper_arm', status: 'needs_attention', note: 'In frames 0 and 2, the upper arm moves forward.', evidence: [{ frameIndex: 0 }, { frameIndex: 2 }] };

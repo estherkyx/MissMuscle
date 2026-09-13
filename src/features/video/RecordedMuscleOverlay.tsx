@@ -7,7 +7,6 @@ import { type ReferenceView } from './reference-view';
 import { motionGuidance, type ExerciseMotion } from './exercise-motion';
 import { scanReferenceClip } from './reference-scan';
 import { referenceAt, type ReferenceTimeline } from './reference-timeline';
-import { getExercise } from '../../../shared/exercises';
 import type { ExerciseId } from '../../../shared/contracts';
 
 export function RecordedMuscleOverlay({ videoRef, exerciseId, enabled }: { videoRef: RefObject<HTMLVideoElement | null>; exerciseId: ExerciseId; enabled: boolean }) {
@@ -63,7 +62,7 @@ export function RecordedMuscleOverlay({ videoRef, exerciseId, enabled }: { video
             !timeline.spans.length?'No reliably bounded movement found. Use a clip showing a clear repetition.':
             'Reference unavailable at this moment: movement endpoints or joints are uncertain.');
           setStatus(frame.multiple?'Multiple people visible. Use a clip with one person.':
-            hasPose?'Prepared body map follows your clip. Play or seek using the video controls.':motionGuidance[exerciseId]);
+            hasPose?'':motionGuidance[exerciseId]);
         }
         animation=requestAnimationFrame(tick);
       } catch {fail();}
@@ -111,10 +110,8 @@ export function RecordedMuscleOverlay({ videoRef, exerciseId, enabled }: { video
     </div>
     <div className="muscle-overlay-controls">
       <div className="heatmap-legend"><span><i className="heat-primary" />Primary targets</span><span><i className="heat-secondary" />Supporting muscles</span><span><i className="heat-other" />Other areas</span></div>
-      <p>Primary: {getExercise(exerciseId)!.targetMuscles.join(' / ')} areas. {exerciseId === 'dumbbell_curl' || exerciseId === 'lat_pulldown' ? 'Supporting: arm / forearm areas.' : ''} Colors are a fixed educational guide, not measured activation or intensity. This is an approximate 2D joint-based illustration.</p>
-      <p>Tracking runs in your browser; the tracker downloads on first use. Preparation scans the local clip once. The body map interpolates adjacent reliable samples; dashed limbs briefly retain their last reliable position, then fade when tracking is lost. The reference demonstrates the full target range at your repetition timing. Use the original video controls to play, pause or seek all three views.</p>
       {enabled && preparing && <progress aria-label="Preparing body mapping" value={scanProgress} max={1} />}
-      {enabled && <p role="status" className={failed ? 'error' : 'muted'}>{status}</p>}
+      {enabled && status && <p role="status" className={failed ? 'error' : 'muted'}>{status}</p>}
     </div>
   </>;
 }
