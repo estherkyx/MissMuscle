@@ -3,6 +3,7 @@ import { CoachContextSchema, LIMITS, validateReportForRequest, type AnalysisRepo
 import { analyzeClip } from './lib/api';
 import { extractFrames, loadLocalClip, waitForMedia, type LocalClip } from './features/video/media';
 import { createPlaybackController } from './features/video/playback';
+import { MuscleOverlay } from './features/video/MuscleOverlay';
 import { CoachPanel, type CoachPanelHandle } from './features/review/CoachPanel';
 import { ReferenceGuide, ReviewPanel } from './features/review/ReviewPanel';
 import { EXERCISES, getExercise, canAnalyzeExercise } from './features/review/exercise-library';
@@ -202,14 +203,14 @@ export default function App() {
       <input ref={fileInputRef} className="visually-hidden" type="file" accept="video/*,.mp4,.mov,.webm,.m4v" disabled={!analysisEnabled || working} aria-label="Choose exercise video" onChange={event => {
         const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void chooseFile(file);
       }} />
-      {clip ? <div className="player"><video key={clip.id} ref={videoRef} src={clip.url} controls playsInline preload="auto" aria-label="Your local exercise clip"
+      {clip ? <div className="tracking-player" key={clip.id}><div className="source-view"><div className="viewer-heading"><span>01 / Original video</span><span>LOCAL CLIP</span></div><div className="player"><video key={clip.id} ref={videoRef} src={clip.url} controls playsInline preload="auto" aria-label="Your local exercise clip"
         onLoadedData={() => { setReady(true); syncPlayback(true); }}
         onTimeUpdate={() => syncPlayback()} onPlay={() => syncPlayback(true)} onPause={() => syncPlayback(true)}
         onSeeking={() => syncPlayback(true)} onSeeked={() => syncPlayback(true)} onEnded={() => syncPlayback(true)}
         onError={() => { setReady(false); setPlaybackError('This video cannot be played here. Try an H.264 MP4 export.'); }} />
         <EvidenceOverlay report={report} request={request} correction={correction} evidenceIndex={selection?.index ?? 0} visible={showKeyframe} />
         {showKeyframe && correction && <div className="frame-label">Evidence · {evidence!.timestampSec.toFixed(2)}s <span>{correction.title}</span></div>}
-      </div> : <div className={`video-placeholder${referenceOnly ? ' reference-placeholder' : ''}`}>
+      </div></div><MuscleOverlay videoRef={videoRef} /></div> : <div className={`video-placeholder${referenceOnly ? ' reference-placeholder' : ''}`}>
         <div className="upload-symbol" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M20 27V9m-7 7 7-7 7 7M9 27v5h22v-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></div>
         <h3>{referenceOnly ? 'Get to know the movement.' : 'Your next rep starts here.'}</h3><p>{referenceOnly ? 'Form and muscle guides are ready. Video analysis is coming later.' : configured ? 'Upload your exercise video to get started.' : 'Choose an exercise above.'}</p>
         {!referenceOnly && <><button disabled={!analysisEnabled || working} onClick={() => fileInputRef.current?.click()}>Upload video <span aria-hidden="true">↗</span></button><small>Up to 15 seconds · max 40 MiB</small></>}

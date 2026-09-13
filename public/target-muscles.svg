@@ -1,10 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 260" role="img" aria-labelledby="title desc">
-  <title id="title">Target muscles of the front upper arm</title>
-  <desc id="desc">An approximate upper-arm diagram highlights biceps brachii. A dashed inner area represents brachialis underneath. Both help bend the elbow. This is not muscle activation measured from footage.</desc>
-  <rect width="600" height="260" rx="20" fill="#eef2e7"/>
-  <path d="M105 42 Q154 15 182 57 L194 176 Q182 198 151 202 L115 239 L75 226 L136 174 L112 91Z" fill="#e4c7a7" stroke="#38533e" stroke-width="3"/>
-  <ellipse cx="155" cy="111" rx="24" ry="58" fill="#8ca75c"/>
-  <ellipse cx="162" cy="154" rx="24" ry="30" fill="none" stroke="#9a542f" stroke-width="3" stroke-dasharray="5 4"/>
-  <g fill="none" stroke-width="2"><path d="M179 104 H264" stroke="#547234"/><path d="M184 158 H264" stroke="#9a542f"/></g>
-  <g font-family="system-ui, sans-serif" fill="#213b30"><text x="280" y="103" font-size="20">Biceps brachii</text><text x="280" y="126" font-size="14">Front of the upper arm</text><text x="280" y="165" font-size="20">Brachialis</text><text x="280" y="188" font-size="14">Underneath the biceps</text><text x="300" y="242" font-size="13" text-anchor="middle">APPROXIMATE ANATOMY · NOT MEASURED ACTIVATION</text></g>
-</svg>
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 440" role="img" aria-labelledby="title desc">
+<title id="title">Dumbbell curl muscle target map</title><desc id="desc">Educational front-view schematic: upper-arm biceps and brachialis area in red, supporting forearms in yellow, other areas in gray. Colors do not represent measured activation.</desc>
+<rect width="600" height="440" rx="18" fill="#101515"/>
+<g stroke="#95a09e" stroke-width="2" fill="#41494a" stroke-linejoin="round">
+<path d="M189 45 C167 45 165 82 178 94 L177 111 L147 124 Q134 131 129 151 L114 205 L94 248 L101 261 L119 247 L141 207 L153 175 L163 221 L158 257 L153 314 L160 373 L155 387 L178 387 L182 318 L190 270 L198 318 L202 387 L225 387 L220 373 L227 314 L222 257 L217 221 L227 175 L239 207 L261 247 L279 261 L286 248 L266 205 L251 151 Q246 131 233 124 L203 111 L202 94 C215 82 213 45 189 45Z"/>
+</g>
+<g fill="#ed383e" stroke="#101515" stroke-width="3"><path d="M143 143 Q151 141 149 160 L139 192 Q134 205 125 205 L131 175Z"/><path d="M237 143 Q229 141 231 160 L241 192 Q246 205 255 205 L249 175Z"/></g>
+<g fill="#f6c744" stroke="#101515" stroke-width="3"><path d="M123 210 Q136 207 125 225 L108 247 Q100 249 105 236Z"/><path d="M257 210 Q244 207 255 225 L272 247 Q280 249 275 236Z"/></g>
+<g fill="none" stroke="#101515" stroke-width="3"><path d="M159 143 Q174 132 188 146 V178 Q165 186 156 166 M221 143 Q206 132 192 146 V178 Q215 186 224 166 M190 186 V249 M168 226 L190 249 L212 226 M161 263 L182 283 M219 263 L198 283"/></g>
+<g font-family="system-ui,sans-serif" fill="#d7dfda"><text x="32" y="30" font-size="11" letter-spacing="2">CURL / TARGET MUSCLES</text><text x="168" y="414" font-size="11" fill="#9caea2">FRONT VIEW</text>
+<circle cx="333" cy="141" r="6" fill="#ed383e"/><text x="349" y="146" font-size="15">Primary targets</text><text x="349" y="169" font-size="12" fill="#aebdb4">Biceps + brachialis area</text>
+<circle cx="333" cy="217" r="6" fill="#f6c744"/><text x="349" y="222" font-size="15">Supporting muscles</text><text x="349" y="245" font-size="12" fill="#aebdb4">Forearm area</text>
+<circle cx="333" cy="293" r="6" fill="#606a6b"/><text x="349" y="298" font-size="15">Other areas</text><text x="325" y="371" font-size="11" fill="#aebdb4">Exercise guide only.</text><text x="325" y="390" font-size="11" fill="#aebdb4">Not measured activation.</text></g></svg>

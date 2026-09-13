@@ -52,7 +52,7 @@ export function ReviewPanel({ report, correction, evidenceIndex, showKeyframe, h
 export function MuscleGuide({ exercise = EXERCISES[0] }: { exercise?: ExerciseReference }) {
   const multiple = exercise.muscles.length > 1;
   return <section className="muscle-guide"><span className="reference-number">02 / Anatomy</span><h3>Target muscles</h3>
-    {multiple ? <div className="muscle-diagrams">{exercise.muscles.map(muscle => <figure key={muscle.id}><MuscleDiagram focus={muscle.id} compact /><figcaption>{muscle.label}</figcaption></figure>)}</div> : <MuscleDiagram focus={exercise.muscles[0].id} />}
+    {exercise.id === 'dumbbell_curl' ? <img className="reference-image" src="/target-muscles.svg" alt="Curl target map: red upper arms indicate primary targets, yellow forearms supporting muscles, and gray other areas." /> : multiple ? <div className="muscle-diagrams">{exercise.muscles.map(muscle => <figure key={muscle.id}><MuscleDiagram focus={muscle.id} compact /><figcaption>{muscle.label}</figcaption></figure>)}</div> : <MuscleDiagram focus={exercise.muscles[0].id} />}
     {exercise.muscles.map(muscle => <p className="muted" key={muscle.id}><strong>{muscle.label}.</strong> {muscle.description}</p>)}
     <p className="anatomy-note">An anatomy guide, not measured muscle activation.</p>
   </section>;
