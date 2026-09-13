@@ -132,7 +132,7 @@ export default function App() {
     try {
       if (current !== generation.current) return;
       setReport(null); setSelection(null);
-      const input = request?.clipId === submittedClip.id ? request : await extractFrames(submittedClip, abort.signal, count => {
+      const input = request?.clipId === submittedClip.id && request.exerciseId === exercise ? request : await extractFrames(submittedClip, reference.id, abort.signal, count => {
         if (current === generation.current) setProgress(count);
       });
       if (current !== generation.current) return;
@@ -191,8 +191,8 @@ export default function App() {
       <button className={mode === 'upload' ? 'mode-choice selected' : 'mode-choice'} aria-pressed={mode === 'upload'} disabled={working} onClick={() => setMode('upload')}><strong>Upload a video</strong><span>Review your form with timestamped evidence</span></button>
       <button className={mode === 'live' ? 'mode-choice selected' : 'mode-choice'} aria-pressed={mode === 'live'} disabled={working} onClick={() => { videoRef.current?.pause(); setMappingEnabled(false); setMode('live'); }}><strong>Live exercise</strong><span>Move with a body map and a spoken coach</span></button>
     </div>
-    {analysisEnabled && <LiveExercise visible={mode === 'live'} />}
-    {mode === 'live' && !analysisEnabled && <section className="video-workspace"><h2>{referenceOnly ? 'Live coaching is available for dumbbell curls.' : 'Choose dumbbell curl to start live coaching.'}</h2><p className="muted">Other exercises have reference sheets only.</p></section>}
+    {exercise === 'dumbbell_curl' && <LiveExercise visible={mode === 'live'} />}
+    {mode === 'live' && exercise !== 'dumbbell_curl' && <section className="video-workspace"><h2>{referenceOnly ? 'Live coaching is available for dumbbell curls.' : 'Choose dumbbell curl to start live coaching.'}</h2><p className="muted">Choose Upload a video to analyse the other supported exercises.</p></section>}
     <div hidden={mode !== 'upload'}>
     <section className="video-workspace" id="movement-video" aria-labelledby="video-title">
       <div className="video-toolbar"><div><span className="eyebrow">Your movement</span><h2 id="video-title">{referenceOnly ? reference.label : clip ? 'Let’s look at your form.' : 'Start with a short clip.'}</h2></div>
@@ -209,7 +209,7 @@ export default function App() {
         onError={() => { setReady(false); setPlaybackError('This video cannot be played here. Try an H.264 MP4 export.'); }} />
         <EvidenceOverlay report={report} request={request} correction={correction} evidenceIndex={selection?.index ?? 0} visible={showKeyframe} />
         {showKeyframe && correction && <div className="frame-label">Evidence · {evidence!.timestampSec.toFixed(2)}s <span>{correction.title}</span></div>}
-      </div></div>{mappingEnabled && <MuscleOverlay videoRef={videoRef} enabled={mappingEnabled} />}</div> : <div className={`video-placeholder${referenceOnly ? ' reference-placeholder' : ''}`}>
+      </div></div>{mappingEnabled && <MuscleOverlay key={reference.id} videoRef={videoRef} exerciseId={reference.id} enabled={mappingEnabled} />}</div> : <div className={`video-placeholder${referenceOnly ? ' reference-placeholder' : ''}`}>
         <div className="upload-symbol" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M20 27V9m-7 7 7-7 7 7M9 27v5h22v-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></div>
         <h3>{referenceOnly ? 'Get to know the movement.' : 'Your next rep starts here.'}</h3><p>{referenceOnly ? 'Form and muscle guides are ready. Video analysis is coming later.' : configured ? 'Upload your exercise video to get started.' : 'Choose an exercise above.'}</p>
         {!referenceOnly && <><button disabled={!analysisEnabled || working} onClick={() => fileInputRef.current?.click()}>Upload video <span aria-hidden="true">↗</span></button><small>Up to 15 seconds · max 40 MiB</small></>}

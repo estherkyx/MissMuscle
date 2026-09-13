@@ -5,6 +5,7 @@ export const CRITERIA = {
   steady_upper_arm: 'Upper arms', neutral_wrist: 'Hands and wrists', steady_torso: 'Torso',
   relaxed_shoulders: 'Shoulders', controlled_movement: 'Movement control',
 };
+function isCurlCriterion(id: string): id is keyof typeof CRITERIA { return Object.hasOwn(CRITERIA, id); }
 export interface LiveFinding {
   criterionId: keyof typeof CRITERIA;
   status: 'needs_attention' | 'improved';
@@ -21,6 +22,7 @@ export interface SavedCorrection {
 export function mergeFindings(previous: LiveFinding[], result: LiveInspectionResult): LiveFinding[] {
   const next = new Map(previous.map(item => [item.criterionId, item]));
   for (const check of result.report.formChecks ?? []) {
+    if (!isCurlCriterion(check.criterionId)) continue;
     if (check.status === 'unclear') continue;
     if (check.status === 'looks_consistent' && !next.has(check.criterionId)) continue;
     next.set(check.criterionId, { criterionId: check.criterionId, status: check.status === 'needs_attention' ? 'needs_attention' : 'improved', note: check.note, windowId: result.window.windowId, observedThroughSec: result.window.startSec + result.report.durationSec });
@@ -30,6 +32,7 @@ export function mergeFindings(previous: LiveFinding[], result: LiveInspectionRes
 export function retainCorrections(previous: SavedCorrection[], result: LiveInspectionResult, recording: RecordingWindow): SavedCorrection[] {
   const next = new Map(previous.map(item => [item.criterionId, item]));
   for (const check of result.report.formChecks ?? []) {
+    if (!isCurlCriterion(check.criterionId)) continue;
     if (check.status !== 'needs_attention' || !check.evidence.length) continue;
     next.delete(check.criterionId);
     next.set(check.criterionId, { criterionId: check.criterionId, result, recording, evidence: check.evidence.map(evidence => ({ ...evidence, windowId: result.window.windowId, criterionId: check.criterionId })) });

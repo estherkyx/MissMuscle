@@ -52,7 +52,8 @@ scope.onmessage = event => {
     try {
       if (!detector) throw new Error('Tracker is not ready');
       const result = detector.detectForVideo(bitmap, event.data.timestampMs);
-      scope.postMessage({ type: 'pose', landmarks: result.landmarks, time: event.data.time, generation: event.data.generation });
+      try { scope.postMessage({ type: 'pose', landmarks: result.landmarks, worldLandmarks: result.worldLandmarks, time: event.data.time, generation: event.data.generation }); }
+      finally { result.close(); }
     } catch (error) {
       console.error('Body tracking frame failed', error);
       scope.postMessage({ type: 'error', message: 'Body tracking stopped. Retry tracking in Chrome.' });

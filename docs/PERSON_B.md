@@ -1,5 +1,13 @@
 # Person B — Astra analysis, GPT-Live, integration
 
+Current exercise expansion: see [multi-exercise implementation and handoff](EXERCISES.md).
+All four dropdown variations support uploaded analysis and motion; live coaching remains curl-only.
+The public interface provides automatic spoken live corrections without microphone access.
+Uploaded mapping now scans through the shared packaged pose worker, preserving full-range reference timing.
+`LiveWindow`, live results, and `LiveCoachContext` reject other exercises; uploaded contracts retain all four.
+Earlier curl-only
+instructions below describe the original build. Real-clip acceptance is still required.
+
 You own `server/`, `src/features/voice/`, and the deployment work. Person A owns
 the main React interface, video extraction, and playback. Keep root package/config
 changes coordinated; you are the default integration owner.

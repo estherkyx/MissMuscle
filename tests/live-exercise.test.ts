@@ -9,12 +9,15 @@ import { createLiveEventProcessor } from '../src/features/voice/live-events';
 function findings(status: 'needs_attention' | 'looks_consistent' | 'unclear' = 'needs_attention', windowId = 'window-1'): LiveInspectionResult {
   return { window: { sessionId: 'session-1', windowId, startSec: 20 }, answer: 'Keep your wrist aligned with your forearm.', report: {
     ...demoReport, clipId: windowId, source: 'astra', durationSec: 10, corrections: [],
-    formChecks: FormCriterionIdSchema.options.map(criterionId => ({ criterionId, status: criterionId === 'neutral_wrist' ? status : 'unclear', note: 'Keep your wrist aligned with your forearm.', evidence: criterionId === 'neutral_wrist' ? [{ frameIndex: 0, timestampSec: 1 }, { frameIndex: 1, timestampSec: 2 }] : [] })),
+    formChecks: FormCriterionIdSchema.options.filter(id => ['steady_upper_arm', 'neutral_wrist', 'steady_torso', 'relaxed_shoulders', 'controlled_movement'].includes(id)).map(criterionId => ({ criterionId, status: criterionId === 'neutral_wrist' ? status : 'unclear', note: 'Keep your wrist aligned with your forearm.', evidence: criterionId === 'neutral_wrist' ? [{ frameIndex: 0, timestampSec: 1 }, { frameIndex: 1, timestampSec: 2 }] : [] })),
   } };
 }
 const tick = () => new Promise<void>(resolve => setImmediate(resolve));
 test('live context starts without a report and separates session and window clocks', () => {
   assert.ok(LiveCoachContextSchema.safeParse({ mode: 'live', sessionId: 'session-1', exerciseId: 'dumbbell_curl', elapsedSec: 600, latest: null }).success);
+  for (const exerciseId of ['lat_pulldown', 'leg_extension', 'dumbbell_front_squat']) {
+    assert.equal(LiveCoachContextSchema.safeParse({ mode: 'live', sessionId: 'session-1', exerciseId, elapsedSec: 0, latest: null }).success, false);
+  }
   assert.ok(LiveCoachContextSchema.safeParse({ mode: 'live', sessionId: 'session-1', exerciseId: 'dumbbell_curl', elapsedSec: 31, latest: findings() }).success);
   assert.equal(LiveCoachContextSchema.safeParse({ mode: 'live', sessionId: 'other-session', exerciseId: 'dumbbell_curl', elapsedSec: 31, latest: findings() }).success, false);
   assert.equal(LiveInspectionRequestSchema.safeParse({ window: { sessionId: 's', windowId: 'wrong', startSec: 500, request: { clipId: 'clip', exerciseId: 'dumbbell_curl', durationSec: 2, frames: [] } } }).success, false);
