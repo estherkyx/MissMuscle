@@ -1,7 +1,11 @@
 # Person B — Astra analysis, GPT-Live, integration
 
 Current exercise expansion: see [multi-exercise implementation and handoff](EXERCISES.md).
-All four dropdown variations now have analysis and motion support; curl-only
+All four dropdown variations support uploaded analysis and motion; live coaching remains curl-only.
+The public interface provides automatic spoken live corrections without microphone access.
+Uploaded mapping now scans through the shared packaged pose worker, preserving full-range reference timing.
+`LiveWindow`, live results, and `LiveCoachContext` reject other exercises; uploaded contracts retain all four.
+Earlier curl-only
 instructions below describe the original build. Real-clip acceptance is still required.
 
 You own `server/`, `src/features/voice/`, and the deployment work. Person A owns
@@ -118,3 +122,21 @@ pauses/seeks/highlights; the coach explains that specific evidence.
 > Coordinate shared contract/dependency changes and own the Sites integration.
 > Keep fixture behaviour explicit. Run the relevant checks and provide the
 > working adapter and endpoint handoff to Person A.
+
+## Automatic live coaching handoff
+
+`LiveCoachContext.guidanceOnly` is additive; the main live workflow sends `true`.
+For this mode the adapter never calls audio `getUserMedia`. A zero-valued Web Audio
+source feeds a MediaStream destination to keep GPT-Live's input clock active.
+Remote GPT-Live audio remains the sole source of coach speech. Cleanup stops the
+silent source, its track, audio context, and provider session.
+
+The server selects automatic-coaching instructions and an empty tool list for
+this mode. Announce verified recent corrections through the typed `announceCue`
+interface; do not request replies or fresh inspections through conversation.
+Legacy conversational callers and the development harness remain compatible.
+`ready` is the automatic coach's waiting status; it must not say `listening`.
+
+Regression coverage checks zero microphone requests, automatic commentary, mute
+and cleanup, and the provider session's instructions/tools/model IDs. Live audio
+acceptance still requires a real provider/browser session.

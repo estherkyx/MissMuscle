@@ -1,4 +1,4 @@
-import { CoachCommandSchema, type CoachCommand, type CoachContext } from '../../../shared/contracts';
+import { InspectionQuestionSchema, LiveInspectionResultSchema, CoachCommandSchema, type CoachCommand, type CoachContext, type SessionCoachContext, type LiveInspectionResult } from '../../../shared/contracts';
 
 type RecordValue = Record<string, unknown>;
 const object = (value: unknown): RecordValue | null => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as RecordValue : null;
@@ -6,7 +6,9 @@ type Call = { callId: string; name: string; arguments: string };
 type Pending = { id: string; calls: Call[] };
 
 export interface LiveEventHandlers {
-  getContext(): CoachContext;
+  getContext(): SessionCoachContext;
+  onInspect?: (question: string) => Promise<LiveInspectionResult>;
+  onInspectionBusy?: (busy: boolean) => void;
   onCommand(command: CoachCommand): void;
   send(event: RecordValue): void;
   onTranscript(entry: { role: 'user' | 'coach'; text: string; final: boolean }): void;
@@ -85,6 +87,33 @@ export function createLiveEventProcessor(handlers: LiveEventHandlers) {
       completedResponses.add(run.id);
       pending.delete(delegationId);
       if (!run.calls.length) return;
+      if (run.calls.some(call => call.name === 'inspect_movement')) {
+        handlers.onInspectionBusy?.(true);
+        void (async () => {
+          try {
+            for (const call of run.calls) {
+              if (stopped) return;
+              let result: unknown;
+              try {
+                const context = handlers.getContext();
+                if (!('mode' in context) || call.name !== 'inspect_movement' || !handlers.onInspect) throw new Error('Inspection unavailable');
+                if (executedCalls.has(call.callId)) throw new Error('Duplicate inspection');
+                executedCalls.add(call.callId);
+                const { question } = InspectionQuestionSchema.parse(JSON.parse(call.arguments));
+                const findings = LiveInspectionResultSchema.parse(await handlers.onInspect(question));
+                const current = handlers.getContext();
+                if (!('mode' in current) || current.sessionId !== findings.window.sessionId ||
+                    current.elapsedSec - (findings.window.startSec + findings.report.durationSec) > 15) throw new Error('Findings are no longer current');
+                result = { status: 'completed', findings };
+              } catch { result = { status: 'error', message: 'A fresh visual assessment is unavailable. Explain the limitation; do not invent a correction.' }; }
+              if (stopped) return;
+              handlers.send({ type: 'response.item.create', event_id: crypto.randomUUID(), item: { type: 'function_call_output', call_id: call.callId, output: JSON.stringify(result) } });
+            }
+            if (!stopped) handlers.send({ type: 'response.create', event_id: crypto.randomUUID() });
+          } finally { handlers.onInspectionBusy?.(false); }
+        })();
+        return;
+      }
       // Lifecycle snapshots intentionally have output: []; use collected items.
       for (const call of run.calls) {
         let result: RecordValue;
@@ -94,6 +123,7 @@ export function createLiveEventProcessor(handlers: LiveEventHandlers) {
           executedCalls.add(call.callId);
           try {
             const context = handlers.getContext();
+            if ('mode' in context) throw new Error('Playback unavailable during live exercise');
             const command = commandFromCall(call.name, call.arguments, context);
             handlers.onCommand(command);
             result = { status: 'dispatched', command, note: 'Sent to the playback handler; playback completion is not verified.' };

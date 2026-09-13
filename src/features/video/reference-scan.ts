@@ -1,5 +1,6 @@
 import type { ExerciseId } from '../../../shared/contracts';
-import type { PoseLandmarker } from '@mediapipe/tasks-vision';
+import type { PoseLandmarkerResult } from '@mediapipe/tasks-vision';
+export interface ReferenceDetector { detectForVideo(video: HTMLVideoElement, timestampMs: number): Pick<PoseLandmarkerResult, 'landmarks' | 'worldLandmarks' | 'close'> | Promise<Pick<PoseLandmarkerResult, 'landmarks' | 'worldLandmarks' | 'close'>>; }
 import { waitForMedia, validateDuration } from './media';
 import { createExerciseSync } from './exercise-motion';
 import { createPoseFilter } from './pose-filter';
@@ -15,7 +16,7 @@ export function scanTimes(duration: number) {
 }
 
 // Separate video and tracker: preparation never seeks the visible player.
-export async function scanReferenceClip(source: string, exerciseId: ExerciseId, detector: Pick<PoseLandmarker,'detectForVideo'>, signal: AbortSignal, progress: (value:number)=>void) {
+export async function scanReferenceClip(source: string, exerciseId: ExerciseId, detector: ReferenceDetector, signal: AbortSignal, progress: (value:number)=>void) {
   const video=document.createElement('video');
   video.muted=true;video.playsInline=true;video.preload='auto';
   const filter=createPoseFilter(),facing=createFacingTracker(),sync=createExerciseSync(exerciseId);
@@ -28,7 +29,7 @@ export async function scanReferenceClip(source: string, exerciseId: ExerciseId, 
       const time=times[i];
       if(Math.abs(video.currentTime-time)>0.001) await waitForMedia(video,'seeked',signal,()=>{video.currentTime=time;});
       signal.throwIfAborted();
-      const result=detector.detectForVideo(video,time*1000);
+      const result=await detector.detectForVideo(video,time*1000);
       try {
         const multiple=result.landmarks.length>1;
         const body=filter.update(result.landmarks,video.videoWidth,video.videoHeight,time);

@@ -9,7 +9,7 @@ export function requireApiKey(env: Env): string {
 
 // Web fetch keeps the provider layer portable to the hosted Worker runtime.
 // No automatic retries: session creation is billable and not idempotent.
-export async function openaiPost(path: '/responses' | '/live/sessions', body: unknown, env: Env, timeoutMs = 70_000): Promise<unknown> {
+export async function openaiPost(path: '/responses' | '/live/sessions', body: unknown, env: Env, timeoutMs = 70_000, signal?: AbortSignal): Promise<unknown> {
   const key = requireApiKey(env);
   let response: Response;
   try {
@@ -17,7 +17,7 @@ export async function openaiPost(path: '/responses' | '/live/sessions', body: un
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
     if (error instanceof Error && ['AbortError', 'TimeoutError'].includes(error.name)) {

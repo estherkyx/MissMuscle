@@ -6,7 +6,7 @@ import { getExercise } from '../../../shared/exercises';
 import { type ReferenceView } from './reference-view';
 import type { ExerciseMotion } from './exercise-motion';
 
-export function ReferenceMotion({ exerciseId, view = null, motion = null, status = 'Start body mapping to prepare the reference.' }: { exerciseId: ExerciseId; view?: ReferenceView | null; motion?: ExerciseMotion | null; status?: string }) {
+export function ReferenceMotion({ exerciseId, live = false, view = null, motion = null, status = 'Start body mapping to prepare the reference.' }: { exerciseId: ExerciseId; live?: boolean; view?: ReferenceView | null; motion?: ExerciseMotion | null; status?: string }) {
   const exercise = getExercise(exerciseId)!;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -31,12 +31,12 @@ export function ReferenceMotion({ exerciseId, view = null, motion = null, status
     <div className="mapped-stage">
       <canvas ref={canvasRef} aria-label={'Proper ' + exercise.label + ' form demonstration'} />
       {motion && !view && <div className="mapped-empty"><strong>Facing angle unavailable</strong><p>Keep your shoulders and hips visible to match the reference angle.</p></div>}
-      {!motion && <div className="mapped-empty"><strong>Full-range reference</strong><p>{status}</p></div>}
-      <span className="reference-phase">{motion ? `${motion.direction} / ${view ? view.held ? 'facing briefly held' : 'approximate facing synced' : 'facing unavailable'}` : 'Reference waits for your clip'}</span>
+      {!motion && <div className="mapped-empty"><strong>{live ? 'Live movement reference' : 'Full-range reference'}</strong><p>{status}</p></div>}
+      <span className="reference-phase">{motion ? `${motion.direction} / ${view ? view.held ? 'facing briefly held' : 'approximate facing synced' : 'facing unavailable'}` : live ? 'Reference waits for your movement' : 'Reference waits for your clip'}</span>
     </div>
     <div className="reference-motion-controls">
       <p>{exercise.summary}</p>
-      <p>Full target range · timing matched to your clip. The reference demonstrates complete movement even when your repetition is partial. Use the original video controls to play, pause or seek all three views. Timing and facing are approximate.</p>
+      <p>{live ? 'Reference follows your visible curl phase. Timing and facing are approximate.' : 'Full target range · timing matched to your clip. The reference demonstrates complete movement even when your repetition is partial. Use the original video controls to play, pause or seek all three views. Timing and facing are approximate.'}</p>
     </div>
   </section>;
 }

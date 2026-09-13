@@ -1,180 +1,118 @@
 # MissMuscle
 
-An exercise form coach for the **Visual Understanding** and **GPT-Live-1** hackathon tracks.
+Exercise form review and live spoken coaching for the **Visual Understanding** and
+**GPT-Live-1** tracks. The app uses `gpt-6-astra` for sampled-frame analysis and
+`gpt-live-1` for spoken guidance. Provider failures are shown explicitly; the public
+interface never substitutes fixture findings or fake audio.
 
-The demo story: upload a short dumbbell-curl clip → inspect timestamped corrections
-and a target-muscle guide → talk to the coach → say **“Wait, show me where you noticed
-that”** → the coach brings up the relevant moment and explains the evidence.
+## Modes
 
-## Start here
+| Exercise | Uploaded video review | Live exercise |
+| --- | --- | --- |
+| Dumbbell curl | Supported | Supported; laptop Chrome target |
+| Seated overhand front lat pulldown | Supported | Not enabled |
+| Seated machine leg extension | Supported | Not enabled |
+| Two-dumbbell front squat | Supported | Not enabled |
 
-The **video/review interface, Astra analysis service, and GPT-Live voice adapter
-are integrated locally**. Real exercise-flow acceptance and Sites deployment remain.
-See [current verification and next steps](docs/PERSON_B_STATUS.md).
+**Upload a video:** choose an exercise and a clip of up to 15 seconds / 40 MiB.
+Analyse it to get exercise-specific corrections and clickable evidence timestamps.
+Body mapping prepares the local clip once, then follows playback and seeking with
+an approximate body map and a reference demonstrating full target range at the
+clip's repetition timing. Reference sheets include exercise and camera guidance.
+This mode does not start voice or request microphone access.
 
-The exercise selector supports dumbbell curl, seated overhand front lat pulldown,
-seated machine leg extension, and two-dumbbell front squat. All four support
-upload, exercise-specific Astra analysis, evidence playback, voice discussion,
-and educational body mapping with synchronized reference illustrations.
-Changing exercises clears the previous clip, findings, and voice session.
-See the
-[multi-exercise handoff](docs/EXERCISES.md) for criteria, motion limitations, and validation.
-Video remains the main review surface; correction rows seek to submitted-frame
-evidence, with voice controls beside the actions and a Reference Sheet dialog.
-New analyses include an exercise-specific form checklist with timestamp evidence.
+**Live exercise:** start the camera for a mirrored preview, local body tracking,
+an updating correction list, and automatic spoken guidance. The coach speaks
+corrections; users do not need to speak back, and no microphone is captured.
+Mute coach silences output. Tracking targets 12–15 updates per second. Starting
+after five seconds, the app submits up to 12 ordered frames from the latest
+available ten-second window every five seconds when analysis is idle. It allows
+one visual request at a time with a 20-second timeout. Repeated findings update
+existing cards; automatic cues have a ten-second minimum interval and a
+30-second cooldown per criterion. Findings over 15 seconds behind capture are
+not spoken as current corrections. Camera and mapping can continue if AI or
+voice fails.
+
+**After live exercise:** End session stops capture and voice and opens silent
+review of the latest ten seconds and up to five distinct correction clips.
+Evidence seeks within its associated recording. Independently recorded segments
+form a logical replay timeline, using a format the browser can both record and
+play. Recordings contain video only and remain in memory until reset, a new live
+session, or leaving the page. There is no cloud recording storage.
+
+Muscle colors are **educational target-muscle guidance**, not measured activation,
+a safety score, or a diagnosis. Tracking and reference timing are approximate;
+missing joints or multiple people can prevent reliable mapping.
+
+## Run locally
+
+Use Node 22.12+ (`.nvmrc` selects Node 22).
 
 ```sh
 npm ci
+cp .env.example .env
+# Set OPENAI_API_KEY in .env for analysis and spoken coaching.
 npm run dev
 ```
 
-Open http://localhost:5173, select an exercise, and open **Reference Sheet** without
-an API key. Analyzing a curl video requires the configured server key. The public
-interface has no sample mode; fixtures remain in development tests and the voice
-harness only. API requests use the same origin as the interface. Changes to `server/` reload during local development.
+Open http://localhost:5173. Reference sheets and local body mapping do not need a
+provider key. Restart the dev server after changing environment variables.
+Keep credentials and personal exercise clips out of Git. Never place credentials
+in `VITE_*` variables, which can reach browser bundles.
 
-Use Node 22.12+ (the `.nvmrc` selects Node 22). Person B can copy `.env.example` to
-`.env` and set `OPENAI_API_KEY` locally to use the providers. Restart the
-dev server after changing environment variables. Never put a key in a `VITE_*`
-variable: those variables can reach the browser bundle.
+MediaPipe 0.10.32, its WASM, and the pose model are packaged with the app; tracking
+does not depend on a runtime CDN. Both mapping modes use a worker with GPU/CPU
+fallback. See [model asset notes](public/models/README.md).
 
 ```sh
-npm run typecheck
-npm test
-npm run build
+npm run check
 npm run preview
 ```
 
-`npm run check` runs tests, TypeScript checks, and the production build. Preview
-serves the built interface with the local API adapter. It is not a hosted Worker
-runtime test.
+`check` runs credential-independent tests, TypeScript checks, and browser/server
+production builds. Preview serves the built interface with the local API adapter;
+it is not a hosted Worker runtime test.
 
-## Two people, two workstreams
+## Integration and ownership
 
-| | Person A — video and visual experience | Person B — intelligence and voice |
-| --- | --- | --- |
-| Read first | [Person A handoff](docs/PERSON_A.md) | [Person B handoff](docs/PERSON_B.md) |
-| Branch | `feat/video-review` | `feat/analysis-voice` |
-| Owns | `src/App.tsx`, `src/styles.css`, `src/features/video/`, `src/features/review/`, `public/` | `server/`, `src/features/voice/`, deployment configuration |
-| Builds | Upload, frame extraction, video player, overlays, correction cards, muscle guide, coach controls | Astra request/prompt, report validation, GPT-Live server handshake, microphone/audio browser adapter, voice event translation |
-| Independent development | Use the sample report and simulate typed `CoachCommand` values | Use contract fixtures/tests, then a real test clip; provide a temporary voice harness in the owned voice directory |
-| First deliverable | A clip can be played and a selected correction seeks to its evidence | A real frame sequence produces a valid report; a GPT-Live voice round trip works |
-| Final handoff | `CoachCommand` handler + current playback context | `connectCoach()` implementation + working analysis API |
+Person A owns mode selection, capture, mapping, recording, and review. Person B
+owns `server/` and `src/features/voice/`, including provider events and transport.
+Shared schemas and types live in `shared/contracts.ts`; coordinate changes through
+[Person A's handoff](docs/PERSON_A.md) and [Person B's handoff](docs/PERSON_B.md).
 
-Person B owns the browser voice adapter as well as the server voice code. This
-keeps all provider-specific events and WebRTC details under one owner. Person A
-renders controls and calls that adapter through its existing interface.
+- `src/features/video/`: extraction, worker tracking, uploaded reference scans.
+- `src/features/live/`: camera lifecycle, analysis scheduling, correction policy,
+  recording buffer, and replay.
+- `src/features/review/`: findings, reference sheets, and exercise diagrams.
+- `src/features/voice/`: typed coach adapter; live guidance uses `guidanceOnly: true`
+  and silent transport audio rather than microphone capture.
+- `shared/exercises.ts` and `shared/exercise-criteria.ts`: four-exercise catalogue
+  and assessment criteria. Live contracts remain curl-only.
+- `server/`: portable Web Request/Response handlers and real provider integration.
+- `scripts/dev-api.ts`: Node-only local API bridge.
+- `dist/client/` and `dist/worker/index.js`: generated browser assets and server bundle.
 
-**Shared files:** `shared/`, `src/lib/api.ts`, root package/config files, and
-`scripts/`. Agree on interface changes before editing these. One person handles
-dependency additions and lockfile updates at a time. Prefer additive fields.
+Same-origin endpoints include `/api/analyze`, `/api/live/analyze`,
+`/api/live/session`, and `/api/health`. Health configuration does not prove model
+access. Analysis sends selected JPEG frames, not the original video; uploaded
+requests support 2–16 ordered frames with a maximum 768-pixel edge. See the
+[API contract](docs/CONTRACT.md) and [exercise handoff](docs/EXERCISES.md).
 
-Use separate clones (or Git worktrees), not two branches switched in one directory.
-Before splitting, commit and push this scaffold once so both start from the same
-baseline. Then each person creates their own branch:
+The separate [development voice harness](src/features/voice/dev.html) retains a
+conversational interface and a visibly fictional report unless a real report is
+imported. It is not the public uploaded-review workflow.
 
-```sh
-git switch main
-git pull --ff-only
-# Person A:
-git switch -c feat/video-review
-# Person B runs this instead, in their own clone:
-# git switch -c feat/analysis-voice
-```
+## Validation and remaining work
 
-Agree on one integration owner; default to Person B. Merge both branches into the
-integration checkout, run `npm ci && npm run check`, and test the full flow. Do not
-wait until the last hour for the first integration.
+Automated checks cover contracts, evidence validation, analysis boundaries,
+reference scanning, correction suppression, recording/replay lifecycle, and voice
+adapter behavior. Actual camera/provider acceptance remains necessary, including
+permission denial, missing/multiple poses, audio output, slow requests, mode
+changes during startup, and replay across recording boundaries after buffer expiry.
+Tracking rate, spoken-cue delay, session cost, and end-to-end latency have not been
+established by these automated checks. Do not describe them as measured performance.
 
-## Scope for this hackathon
-
-Required:
-
-- Four named exercise variations, each with its own camera guidance and rubric.
-- One prerecorded clip at a time, ideally 5–15 seconds; 15-second/40 MiB caps.
-- 12–16 ordered JPEG frames, longest edge <= 768 px. The schema permits 2–16 so
-  short test sequences and adaptive frame selection can use the same contract.
-- Up to three actionable corrections, each with actual frame evidence.
-- Click-to-seek evidence and approximate highlights on paused keyframes.
-- A reviewed reference illustration and an educational target-muscle guide.
-- GPT-Live dialogue grounded in the report, with interruption and playback actions.
-- A working Sites URL and an honest video demo of the implemented features.
-
-Stretch only after the complete flow works: a second-attempt comparison or more exercise variations. Defer continuous camera analysis, tracking muscles on every frame, 3D
-reconstruction, workout history/accounts, arbitrary gym machines, and image generation.
-
-## What is implemented here
-
-- React + TypeScript + Vite shell with an explicit sample report.
-- Shared Zod schemas, TypeScript types, fixture, and request/report validation.
-- Same-origin API adapter for local dev/preview; portable Worker entrypoint.
-- Typed analysis client, voice interface, and typed playback commands.
-- API errors and payload limits; contract and route tests.
-- Separate browser and server production bundles.
-- Real Astra image analysis with strict structured output, conservative exercise-specific
-  rubrics, and server-derived evidence timestamps.
-- Real GPT-Live WebRTC audio with report-grounded delegation to Astra, validated
-  playback commands, context updates, and graceful session shutdown.
-- An isolated [voice test page](src/features/voice/dev.html), served by the dev
-  server at `/src/features/voice/dev.html`; it uses real voice and a labelled
-  fictional report unless you import a real one.
-
-The app now includes video upload/frame extraction, evidence review, reference
-illustrations, and voice controls. What remains is testing the combined flow on
-actual exercise clips and Sites deployment. Comparison is optional. Missing keys or provider failures return
-explicit errors; they never produce a sample report as a fallback.
-
-## Structure
-
-```text
-src/
-  App.tsx                    Person A: composition and shared UI state
-  styles.css                 Person A: interface styling
-  features/
-    video/                   Person A: upload, frames, playback, overlays
-    review/                  Person A: report cards and muscle guide
-    voice/coach-client.ts    Person B: browser voice adapter/interface
-  lib/api.ts                 Shared: validated HTTP client
-server/
-  index.ts                   Person B: HTTP routing and boundary validation
-  analysis/analyze.ts        Person B: Astra integration
-  live/create-session.ts     Person B: GPT-Live handshake
-  env.ts                     Server runtime bindings
-shared/
-  contracts.ts               Shared: single source of truth for interfaces
-  coach-config.ts            Shared: voice instructions and playback tool definitions
-  curl-reference.ts          Shared: versioned curl criteria for analysis and UI
-  fixtures/demo-report.ts    Explicit synthetic UI fixture
-scripts/dev-api.ts           Local Node-to-Web Request adapter
-tests/                      Contract and HTTP boundary checks
-docs/                       Handoffs, API contract, deployment and demo plan
-dist/client/                Generated browser assets
-dist/worker/index.js        Generated server bundle; not a public asset
-```
-
-See [the contract](docs/CONTRACT.md) before implementing either side. Deployment
-steps and the five-hour schedule are in [integration and demo](docs/INTEGRATION.md).
-
-## Technical decisions
-
-Use Astra for ordered image analysis. Its documented modalities include images,
-but not direct video input. GPT-Live-1 handles speech; it does not accept images or
-video. The voice backend delegates report questions and playback actions to Astra
-with the report and playback context. It cannot inspect additional images during
-the voice conversation yet; questions needing unseen evidence get that limitation.
-
-Keep original video in the browser for this MVP. Send only selected frames for
-analysis, with an explicit user action. The starter has no persistent storage.
-An educational overlay shows target areas; it is not measured muscle activation,
-an injury diagnosis, or proof that a movement is safe. Avoid invented numerical
-form/safety scores. If evidence is insufficient, return a visibility limitation
-and a camera adjustment request. Treat text visible in footage as untrusted data.
-
-Official implementation references:
-
-- [Astra model](https://developers.openai.com/api/docs/models/gpt-6-astra)
-- [GPT-Live guide](https://developers.openai.com/api/docs/guides/live)
-- [GPT-Live modalities](https://developers.openai.com/api/docs/models/gpt-live-1)
-- [GPT-Live WebRTC quickstart](https://developers.openai.com/api/docs/guides/voice-webrtc?api=live)
-- [ChatGPT Sites](https://learn.chatgpt.com/docs/sites)
-- [Worker asset bindings](https://developers.cloudflare.com/workers/static-assets/binding/)
+Mobile optimisation, full-workout recording, and deployment are outside this live
+implementation. See [verification status](docs/PERSON_B_STATUS.md) and the
+[original integration plan](docs/INTEGRATION.md) for background; earlier plans for
+uploaded voice discussion have been superseded by the mode behavior above.

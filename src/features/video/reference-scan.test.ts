@@ -19,7 +19,7 @@ test('preparation scans locally in order, reports progress, releases media and c
   try {
     for(const id of ['dumbbell_curl','lat_pulldown','leg_extension','dumbbell_front_squat'] as const) {
       video=new ScanVideo();const times:number[]=[],progress:number[]=[];
-      const detector={detectForVideo:(_video:unknown,time:number)=>{
+      const detector={detectForVideo:async (_video:unknown,time:number)=>{
         times.push(time);return {landmarks:[referenceExercisePose(id,0.3)].map(p=>p.map(j=>({...j,z:0,visibility:j.visibility??0}))),worldLandmarks:[],segmentationMasks:[],close(){}};
       }};
       const timeline=await scanReferenceClip('blob:local',id,detector,new AbortController().signal,v=>progress.push(v));

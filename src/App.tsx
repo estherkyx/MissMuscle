@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { CoachContextSchema, LIMITS, validateReportForRequest, type AnalysisReport, type AnalysisRequest, type CoachCommand } from '../shared/contracts';
+import { useEffect, useRef, useState } from 'react';
+import { LIMITS, validateReportForRequest, type AnalysisReport, type AnalysisRequest, type CoachCommand } from '../shared/contracts';
 import { analyzeClip } from './lib/api';
 import { extractFrames, loadLocalClip, waitForMedia, type LocalClip } from './features/video/media';
 import { createPlaybackController } from './features/video/playback';
 import { MuscleOverlay } from './features/video/MuscleOverlay';
-import { CoachPanel, type CoachPanelHandle } from './features/review/CoachPanel';
+import { LiveExercise } from './features/live/LiveExercise';
 import { ReferenceGuide, ReviewPanel } from './features/review/ReviewPanel';
 import { EXERCISES, getExercise, canAnalyzeExercise } from './features/review/exercise-library';
 import { EvidenceOverlay } from './features/video/EvidenceOverlay';
@@ -14,6 +14,7 @@ const messageOf = (error: unknown) => error instanceof Error ? error.message : '
 
 export default function App() {
   const [exercise, setExercise] = useState('');
+  const [mode, setMode] = useState<'upload' | 'live'>('upload');
   const selectedExercise = getExercise(exercise);
   const reference = selectedExercise ?? EXERCISES[0];
   const referenceOnly = !!selectedExercise && !selectedExercise.analysisAvailable;
@@ -33,7 +34,6 @@ export default function App() {
   const referenceSheetRef = useRef<HTMLDialogElement>(null);
   const openReference = () => { referenceSheetRef.current?.showModal(); };
   const videoRef = useRef<HTMLVideoElement>(null);
-  const coachRef = useRef<CoachPanelHandle>(null);
   const playbackRef = useRef<ReturnType<typeof createPlaybackController> | null>(null);
   const activeClip = useRef<LocalClip | null>(null);
   const generation = useRef(0);
@@ -89,8 +89,6 @@ export default function App() {
     playbackRef.current?.cancel();
     videoRef.current?.pause();
     setError(''); setPlaybackError(''); setPhase('loading');
-    try { await coachRef.current?.stop(); }
-    catch (e) { if (current === generation.current) { setError(messageOf(e)); setPhase('error'); } return null; }
     if (current !== generation.current) return null;
     if (activeClip.current) URL.revokeObjectURL(activeClip.current.url);
     activeClip.current = null;
@@ -132,7 +130,6 @@ export default function App() {
     setError(''); setPlaybackError(''); setPhase('extracting'); setProgress(0);
     playbackRef.current?.cancel(); videoRef.current?.pause();
     try {
-      await coachRef.current?.stop();
       if (current !== generation.current) return;
       setReport(null); setSelection(null);
       const input = request?.clipId === submittedClip.id && request.exerciseId === exercise ? request : await extractFrames(submittedClip, reference.id, abort.signal, count => {
@@ -144,7 +141,6 @@ export default function App() {
       if (current !== generation.current || activeClip.current?.id !== input.clipId) return;
       const validated = validateReportForRequest(result, input);
       if (validated.source !== 'astra') throw new Error('The analysis service returned sample data. No findings have been attached to your clip.');
-      await coachRef.current?.stop();
       if (current !== generation.current) return;
       videoRef.current?.pause();
       setReport(validated); setPhase('complete');
@@ -178,24 +174,26 @@ export default function App() {
   const correction = report?.corrections.find(item => item.id === selection?.id);
   const evidence = correction?.evidence[selection?.index ?? 0];
   const showKeyframe = !!evidence && playback.paused && !playback.seeking && Math.abs(playback.time - evidence.timestampSec) <= 0.05;
-  const context = useMemo(() => {
-    if (!analysisEnabled || !report || !clip || !ready) return null;
-    const result = CoachContextSchema.safeParse({ report, currentTimeSec: Math.min(report.durationSec, Math.max(0, playback.time)), selectedCorrectionId: correction?.id ?? null });
-    return result.success ? result.data : null;
-  }, [analysisEnabled, report, clip, ready, playback.time, playback.paused, playback.seeking, correction?.id]);
   const working = phase === 'loading' || phase === 'extracting' || phase === 'analyzing';
 
   const configured = !!selectedExercise;
   const progressText = phase === 'loading' ? 'Preparing video…' : phase === 'extracting' ? `Preparing video… ${Math.round(progress / LIMITS.maxFrames * 100)}%` : phase === 'analyzing' ? 'Reviewing your form…' : '';
 
   return <main>
-    <header><a className="brand" href="/">MissMuscle<span>✳</span></a><span className="tag">A little guidance. A stronger next rep.</span></header>
+    <header><a className="brand" href="/" aria-label="MissMuscle home"><img src="/logo.png" alt="MissMuscle" width="1254" height="1254" /></a></header>
     <section className="intro"><p className="eyebrow">Your personal form coach</p><h1>Make your next rep <em>better.</em></h1></section>
     <div className="exercise-toolbar"><section className="exercise-setup" aria-label="Choose your exercise">
       <label><span className="field-label">Exercise</span><select value={exercise} disabled={working} onChange={event => void changeExercise(event.target.value)}>
         <option value="" disabled>Choose an exercise</option>{EXERCISES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
       </select></label>
     </section><button className="secondary small-button exercise-reference" onClick={openReference} disabled={!configured}>Reference Sheet ↗</button></div>
+    <div className="mode-selector" role="group" aria-label="Choose review mode">
+      <button className={mode === 'upload' ? 'mode-choice selected' : 'mode-choice'} aria-pressed={mode === 'upload'} disabled={working} onClick={() => setMode('upload')}><strong>Upload a video</strong><span>Review your form with timestamped evidence</span></button>
+      <button className={mode === 'live' ? 'mode-choice selected' : 'mode-choice'} aria-pressed={mode === 'live'} disabled={working} onClick={() => { videoRef.current?.pause(); setMappingEnabled(false); setMode('live'); }}><strong>Live exercise</strong><span>Move with a body map and a spoken coach</span></button>
+    </div>
+    {exercise === 'dumbbell_curl' && <LiveExercise visible={mode === 'live'} />}
+    {mode === 'live' && exercise !== 'dumbbell_curl' && <section className="video-workspace"><h2>{referenceOnly ? 'Live coaching is available for dumbbell curls.' : 'Choose dumbbell curl to start live coaching.'}</h2><p className="muted">Choose Upload a video to analyse the other supported exercises.</p></section>}
+    <div hidden={mode !== 'upload'}>
     <section className="video-workspace" id="movement-video" aria-labelledby="video-title">
       <div className="video-toolbar"><div><span className="eyebrow">Your movement</span><h2 id="video-title">{referenceOnly ? reference.label : clip ? 'Let’s look at your form.' : 'Start with a short clip.'}</h2></div>
         <div className="actions">{clip && <button className="secondary small-button" disabled={working} onClick={() => fileInputRef.current?.click()}>Replace video</button>}
@@ -220,7 +218,7 @@ export default function App() {
         <div className="analysis-action-buttons"><button className="secondary" disabled={!clip || !ready || working || !analysisEnabled} aria-pressed={mappingEnabled} onClick={() => setMappingEnabled(value => !value)}>{mappingEnabled ? 'Stop body mapping' : 'Start body mapping'}</button>
         <button disabled={!clip || !ready || working || !analysisEnabled} onClick={() => void analyze()}>{phase === 'analyzing' || phase === 'extracting' ? 'Analyzing…' : report ? 'Analyze again' : 'Analyze clip'} <span aria-hidden="true">↗</span></button></div>
         <span className="clip-meta">{clip ? `${clip.name} · ${clip.durationSec.toFixed(1)}s` : 'Your video stays on your device.'}</span>
-      </div><CoachPanel key={`${clip?.id ?? 'none'}:${report?.id ?? 'none'}`} ref={coachRef} context={context} onCommand={handleCoachCommand} /></div>}
+      </div></div>}
       {progressText && <p role="status" className="progress-status">{progressText}</p>}
       {phase === 'extracting' && <progress value={progress} max={LIMITS.maxFrames} aria-label="Video preparation progress" />}
       {error && <p className="error" role="alert">{error}</p>}{playbackError && <p className="error" role="alert">{playbackError}</p>}
@@ -228,6 +226,7 @@ export default function App() {
     {!referenceOnly && report && <section className="corrections-section" aria-label="Video corrections">
       <ReviewPanel report={report} correction={correction} evidenceIndex={selection?.index ?? 0} showKeyframe={showKeyframe} hasVideo={!!clip} onCorrection={showCorrection} onEvidence={showEvidence} onSeek={timestampSec => handleCoachCommand({ type: 'seek_video', timestampSec })} />
     </section>}
+    </div>
     <dialog ref={referenceSheetRef} className="reference-modal" aria-labelledby="reference-modal-title" onClick={event => {
       if (event.target === event.currentTarget) {
         const bounds = event.currentTarget.getBoundingClientRect();

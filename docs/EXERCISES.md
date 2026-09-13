@@ -1,8 +1,10 @@
 # Multi-exercise implementation and handoff
 
 All four dropdown variations support local upload, Astra review, submitted-frame
-evidence seeking, GPT-Live discussion, body mapping and synchronized illustrations.
-The production interface uses uploaded clips; fictional curl fixtures remain in tests and the voice development harness.
+evidence seeking, body mapping and synchronized illustrations. Live camera coaching
+is curl-only and provides automatic spoken corrections without microphone capture.
+Uploaded review has no voice session. Fictional curl fixtures remain in tests and
+the separate conversational voice development harness.
 
 Integration with main retains the Analyze clip action, expandable form checklist,
 evidence seeking, reference dialog, and the single body-mapping toggle.
@@ -13,7 +15,8 @@ use that same catalogue. Person A and Person B should use these shared definitio
 ## Shared interfaces and ownership
 
 - [contracts](../shared/contracts.ts) exports `ExerciseId` from the four-value Zod
-  enum. Requests, reports and voice contexts share it. Schema version stays `1`;
+  enum. Uploaded requests and reports share it; live contexts and analysis windows
+  are restricted to dumbbell curls. Schema version stays `1`;
   deploy UI and server together because older servers accept only curl requests.
 - [exercise catalogue](../shared/exercises.ts) owns labels, variants, camera tips,
   target muscles and sources. It attaches versioned [criteria](../shared/exercise-criteria.ts)

@@ -1,7 +1,11 @@
 # Person A — video and visual experience
 
 Current exercise expansion: see [multi-exercise implementation and handoff](EXERCISES.md).
-All four dropdown variations now have analysis and motion support; curl-only
+All four dropdown variations support uploaded analysis and motion; live coaching remains curl-only.
+The public interface provides automatic spoken live corrections without microphone access.
+Uploaded mapping now scans through the shared packaged pose worker, preserving full-range reference timing.
+`LiveWindow`, live results, and `LiveCoachContext` reject other exercises; uploaded contracts retain all four.
+Earlier curl-only
 instructions below describe the original build. Real-clip acceptance is still required.
 
 You own `src/App.tsx`, `src/styles.css`, `src/features/video/`,
@@ -90,3 +94,17 @@ the adapter. Handle a connection finishing after its component has unmounted.
 > that supports “show me where you noticed that”. Person B owns server/ and
 > src/features/voice/. Coordinate changes to shared contracts and package files.
 > Finish by running the relevant checks and reporting the handoff interface.
+
+## Automatic live coaching and replay handoff
+
+The main interface has separate upload and live modes. Upload review keeps
+timestamp seeking and does not mount voice controls. Live mode uses automatic
+spoken guidance with `guidanceOnly: true`; its UI must not ask the user to speak
+or request microphone access. Person B owns the silent voice transport.
+
+Replay object URLs are allocated and released together inside the React effect
+in `SessionReplay`, through `createReplayResources`. Do not allocate these URLs
+in render or `useMemo`: Strict Mode cleanup would revoke URLs reused by the next
+effect setup. The recorder selects a jointly recordable/playable MIME type and
+retains the actual recorder MIME type. Keep recorded frames and evidence offsets
+in source orientation; only live camera/body-map presentation is mirrored.
