@@ -38,3 +38,7 @@ main{max-width:1500px}.workspace{grid-template-columns:minmax(0,1.65fr) minmax(3
 
 
 .tracking-player .player{height:auto}
+
+.analysis-action-buttons{display:flex;gap:10px;flex-shrink:0}.analysis-action-buttons button{font-size:12px;padding:12px 14px;white-space:nowrap}.analysis-action-buttons button>span{margin-left:12px}.analysis-controls{flex-wrap:wrap}.tracking-player .muscle-overlay-controls{padding:10px 16px}.muscle-overlay-controls .heatmap-legend{margin:0}@media(max-width:720px){.reference-motion{display:block}.reference-motion .mapped-stage{aspect-ratio:3/2}}@media(max-width:560px){.analysis-controls .clip-meta{flex-basis:100%;text-align:left}.analysis-action-buttons{gap:8px}.analysis-action-buttons button{padding:12px 10px;font-size:11px}.analysis-action-buttons button>span{margin-left:6px}}
+
+.reference-anatomy:has(>svg:nth-child(2)){flex-direction:column;gap:12px}.reference-anatomy .muscle-diagram{height:auto;min-height:0;max-height:none}.reference-anatomy:has(>svg:nth-child(2))>svg{width:100%;flex-shrink:0}@media(max-width:560px){.reference-anatomy{max-height:none}.reference-anatomy .muscle-diagram{max-height:none}.reference-anatomy:has(>svg:nth-child(2)){max-height:none}}

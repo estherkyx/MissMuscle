@@ -4,9 +4,8 @@ import { drawMappedBody } from './mapped-body';
 import { ReferenceMotion } from './ReferenceMotion';
 import { createCurlSync, type CurlMotion } from './curl-sync';
 
-export function MuscleOverlay({ videoRef }: { videoRef: RefObject<HTMLVideoElement | null> }) {
+export function MuscleOverlay({ videoRef, enabled }: { videoRef: RefObject<HTMLVideoElement | null>; enabled: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [enabled, setEnabled] = useState(false);
   const [status, setStatus] = useState('');
   const [failed, setFailed] = useState(false);
   const [mapped, setMapped] = useState(false);
@@ -14,6 +13,7 @@ export function MuscleOverlay({ videoRef }: { videoRef: RefObject<HTMLVideoEleme
   const [motion, setMotion] = useState<CurlMotion | null>(null);
 
   useEffect(() => {
+    setMapped(false); setMotion(null);
     if (!enabled) return;
     const video = videoRef.current, canvas = canvasRef.current;
     if (!video || !canvas) return;
@@ -47,7 +47,7 @@ export function MuscleOverlay({ videoRef }: { videoRef: RefObject<HTMLVideoEleme
           drawMappedBody(context, width, height, video!.videoWidth, video!.videoHeight, result.landmarks);
           setMotion(sync.update(result.landmarks, video!.videoWidth, video!.videoHeight, video!.currentTime));
           setMapped(hasPose); setTime(video!.currentTime);
-          setStatus(result.landmarks.length > 1 ? 'Multiple people visible; a single body map is unavailable.' : hasPose ? 'Mapped to the current video moment' : 'No clear body regions detected at this moment.');
+          setStatus(result.landmarks.length > 1 ? 'Multiple people visible; a single body map is unavailable.' : hasPose ? '' : 'No clear body regions detected at this moment.');
         }
         animation = requestAnimationFrame(tick);
       } catch {
@@ -88,11 +88,7 @@ export function MuscleOverlay({ videoRef }: { videoRef: RefObject<HTMLVideoEleme
       </div>
     </div>
     <div className="muscle-overlay-controls">
-      <div className="map-control-row"><button className="secondary" aria-pressed={enabled} onClick={() => { setMapped(false); setMotion(null); setEnabled(value => !value); }}>{enabled ? 'Stop body mapping' : 'Start body mapping'}</button><span className="map-sync-note">One timeline · all three views</span></div>
       <div className="heatmap-legend"><span><i className="heat-primary" />Primary targets</span><span><i className="heat-secondary" />Supporting muscles</span><span><i className="heat-other" />Other areas</span></div>
-      <p>Primary: biceps / brachialis area. Supporting: forearm area. Colors are a fixed dumbbell-curl guide, not measured activation or intensity. This is an approximate 2D joint-based illustration.</p>
-      <p>Tracking runs in your browser; the tracker downloads on first use. Hidden regions are omitted. Use the original video controls to play or seek all three views.</p>
-      {enabled && <p role="status" className={failed ? 'error' : 'muted'}>{status}{failed && ' Stop and start mapping to retry.'}</p>}
     </div>
   </>;
 }

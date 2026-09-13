@@ -19,6 +19,7 @@ export default function App() {
   const referenceOnly = !!selectedExercise && !selectedExercise.analysisAvailable;
   const analysisEnabled = canAnalyzeExercise(exercise);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [mappingEnabled, setMappingEnabled] = useState(false);
   const [clip, setClip] = useState<LocalClip | null>(null);
   const [report, setReport] = useState<AnalysisReport | null>(null);
   const [request, setRequest] = useState<AnalysisRequest | null>(null);
@@ -93,7 +94,7 @@ export default function App() {
     if (current !== generation.current) return null;
     if (activeClip.current) URL.revokeObjectURL(activeClip.current.url);
     activeClip.current = null;
-    setClip(null); setReady(false); setRequest(null); setSelection(null);
+    setMappingEnabled(false); setClip(null); setReady(false); setRequest(null); setSelection(null);
     setPlayback({ time: 0, paused: true, seeking: false });
     setReport(null);
     setProgress(0); setPhase('idle');
@@ -203,28 +204,29 @@ export default function App() {
       <input ref={fileInputRef} className="visually-hidden" type="file" accept="video/*,.mp4,.mov,.webm,.m4v" disabled={!analysisEnabled || working} aria-label="Choose exercise video" onChange={event => {
         const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void chooseFile(file);
       }} />
-      {clip ? <div className="tracking-player" key={clip.id}><div className="source-view"><div className="viewer-heading"><span>01 / Original video</span><span>LOCAL CLIP</span></div><div className="player"><video key={clip.id} ref={videoRef} src={clip.url} controls playsInline preload="auto" aria-label="Your local exercise clip"
+      {clip ? <div className={mappingEnabled ? "tracking-player" : "video-only-player"} key={clip.id}><div className="source-view"><div className="viewer-heading" style={{ display: mappingEnabled ? undefined : 'none' }}><span>01 / Original video</span><span>LOCAL CLIP</span></div><div className="player"><video key={clip.id} ref={videoRef} src={clip.url} controls playsInline preload="auto" aria-label="Your local exercise clip"
         onLoadedData={() => { setReady(true); syncPlayback(true); }}
         onTimeUpdate={() => syncPlayback()} onPlay={() => syncPlayback(true)} onPause={() => syncPlayback(true)}
         onSeeking={() => syncPlayback(true)} onSeeked={() => syncPlayback(true)} onEnded={() => syncPlayback(true)}
         onError={() => { setReady(false); setPlaybackError('This video cannot be played here. Try an H.264 MP4 export.'); }} />
         <EvidenceOverlay report={report} request={request} correction={correction} evidenceIndex={selection?.index ?? 0} visible={showKeyframe} />
         {showKeyframe && correction && <div className="frame-label">Evidence · {evidence!.timestampSec.toFixed(2)}s <span>{correction.title}</span></div>}
-      </div></div><MuscleOverlay videoRef={videoRef} /></div> : <div className={`video-placeholder${referenceOnly ? ' reference-placeholder' : ''}`}>
+      </div></div>{mappingEnabled && <MuscleOverlay videoRef={videoRef} enabled={mappingEnabled} />}</div> : <div className={`video-placeholder${referenceOnly ? ' reference-placeholder' : ''}`}>
         <div className="upload-symbol" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M20 27V9m-7 7 7-7 7 7M9 27v5h22v-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></div>
         <h3>{referenceOnly ? 'Get to know the movement.' : 'Your next rep starts here.'}</h3><p>{referenceOnly ? 'Form and muscle guides are ready. Video analysis is coming later.' : configured ? 'Upload your exercise video to get started.' : 'Choose an exercise above.'}</p>
         {!referenceOnly && <><button disabled={!analysisEnabled || working} onClick={() => fileInputRef.current?.click()}>Upload video <span aria-hidden="true">↗</span></button><small>Up to 15 seconds · max 40 MiB</small></>}
       </div>}
       {!referenceOnly && <div className="video-bottom"><div className="analysis-controls">
-        <button disabled={!clip || !ready || working || !analysisEnabled} onClick={() => void analyze()}>{phase === 'analyzing' || phase === 'extracting' ? 'Analyzing…' : report ? 'Analyze again' : 'Analyze clip'} <span aria-hidden="true">↗</span></button>
+        <div className="analysis-action-buttons"><button className="secondary" disabled={!clip || !ready || working || !analysisEnabled} aria-pressed={mappingEnabled} onClick={() => setMappingEnabled(value => !value)}>{mappingEnabled ? 'Stop body mapping' : 'Start body mapping'}</button>
+        <button disabled={!clip || !ready || working || !analysisEnabled} onClick={() => void analyze()}>{phase === 'analyzing' || phase === 'extracting' ? 'Analyzing…' : report ? 'Analyze again' : 'Analyze clip'} <span aria-hidden="true">↗</span></button></div>
         <span className="clip-meta">{clip ? `${clip.name} · ${clip.durationSec.toFixed(1)}s` : 'Your video stays on your device.'}</span>
       </div><CoachPanel key={`${clip?.id ?? 'none'}:${report?.id ?? 'none'}`} ref={coachRef} context={context} onCommand={handleCoachCommand} /></div>}
       {progressText && <p role="status" className="progress-status">{progressText}</p>}
       {phase === 'extracting' && <progress value={progress} max={LIMITS.maxFrames} aria-label="Video preparation progress" />}
       {error && <p className="error" role="alert">{error}</p>}{playbackError && <p className="error" role="alert">{playbackError}</p>}
     </section>
-    {!referenceOnly && <section className="corrections-section" aria-label="Video corrections">
-      {report ? <ReviewPanel report={report} correction={correction} evidenceIndex={selection?.index ?? 0} showKeyframe={showKeyframe} hasVideo={!!clip} onCorrection={showCorrection} onEvidence={showEvidence} onSeek={timestampSec => handleCoachCommand({ type: 'seek_video', timestampSec })} /> : <div className="section-heading"><h2>Analysis</h2></div>}
+    {!referenceOnly && report && <section className="corrections-section" aria-label="Video corrections">
+      <ReviewPanel report={report} correction={correction} evidenceIndex={selection?.index ?? 0} showKeyframe={showKeyframe} hasVideo={!!clip} onCorrection={showCorrection} onEvidence={showEvidence} onSeek={timestampSec => handleCoachCommand({ type: 'seek_video', timestampSec })} />
     </section>}
     <dialog ref={referenceSheetRef} className="reference-modal" aria-labelledby="reference-modal-title" onClick={event => {
       if (event.target === event.currentTarget) {
