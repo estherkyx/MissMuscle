@@ -1,7 +1,33 @@
 # Person A: sourced curl comparison and review
 
+## Exercise library update
+
+`exercise-library.ts` is a browser-side catalogue. It adds lat pulldown, seated
+leg extension, and dumbbell front squat without adding any new analysis models,
+request exercise IDs, or provider routes. `ExerciseDiagrams.tsx` supplies original
+schematics and approximate muscle-location diagrams. Exercise changes
+reset the active clip/report, and reference-only selections do not expose analysis
+or voice controls. Returning to dumbbell curl restores the existing analysis flow.
+
+Targets are lats for pulldowns, quadriceps for leg extensions, and quadriceps and
+glutes for the front squat. The squat reference specifies two dumbbells held at
+shoulder height. All target muscles are shown together in the reference sheet, without a separate
+muscle selector. No unsupported
+quadriceps-head or lat-region targeting options are offered.
+
+New references (paraphrased; no source imagery copied):
+
+- [ACE seated lat pulldown](https://www.acefitness.org/resources/everyone/exercise-library/158/seated-lat-pulldown/)
+- [NASM pulldown biomechanics](https://www.nasm.org/resource-center/blog/training/the-biomechanics-of-the-lat-pulldown-muscles-grip-and-form)
+- [Life Fitness Optima manual, leg extension on printed page 17](https://www.lifefitness.com.au/wp-content/uploads/2015/02/Optima_user_manual_for_all_strength_2_585_1371787541.pdf#page=18)
+- [NASM dumbbell front squat](https://www.nasm.org/resource-center/exercise-library/dumbbell-front-squat)
+
+Machine setup follows the equipment's own labels; the illustrated leg-extension
+machine is schematic. These references are educational prototypes, not validated
+pose assessments or trainer sign-off.
+
 [ReviewPanel](ReviewPanel.tsx) consumes `AnalysisReport` directly and displays
-timestamped corrections, exact submitted-frame evidence, reference guidance,
+timestamped corrections linked to the main video, reference guidance,
 visibility limitations, and next-attempt focus. Unassessable reports and assessable
 reports with zero corrections have distinct empty states. Fixture findings stay
 explicit and separate from analysis of uploaded footage.
@@ -52,9 +78,11 @@ the observation. A correction-specific source mapping requires an agreed criteri
 
 ## Coordination handoff for Person B
 
-No shared files or package files were changed, and no teammate integration is claimed.
-The reference record is intentionally staged in Person A's directory until the two
-owners agree to its shared location and semantics. Person B should:
+Integration update: the reference is now in `shared/curl-reference.ts`, with the
+original import path re-exported for compatibility. The Astra prompt uses this
+same reference. The main app uses the real voice adapter, forwards error and
+cancellation callbacks, and appends its transcript fragments. The original
+coordination requirements below remain useful for further changes:
 
 1. Review/agree `curlReference` and coordinate promotion to a shared browser-safe
    module. Both prompt and visual UI must use the same reference version.
@@ -70,9 +98,8 @@ owners agree to its shared location and semantics. Person B should:
 5. Ground voice in the resulting report and reference standard. Keep provider events
    within the owned voice adapter; use the [playback handoff](../video/README.md).
 
-The current analysis service/voice adapter are still stubs. This work implements
-the comparison UI and sourced rubric; it does not claim the backend already applies
-the rubric or that detection accuracy has been established.
+The analysis service and voice adapter are implemented and integrated. Detection
+accuracy on real exercise clips still needs joint testing.
 
 ## Joint accuracy acceptance
 

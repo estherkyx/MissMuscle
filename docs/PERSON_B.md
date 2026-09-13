@@ -4,12 +4,18 @@ You own `server/`, `src/features/voice/`, and the deployment work. Person A owns
 the main React interface, video extraction, and playback. Keep root package/config
 changes coordinated; you are the default integration owner.
 
+**Implementation update:** the analysis service and voice adapter below are now
+implemented. Read [verification, handoff, and next actions](PERSON_B_STATUS.md)
+first. The sections below retain the implementation requirements and acceptance
+checks for integration; they are no longer a list of missing provider code.
+
 ## Your starting point
 
 Run `npm ci && npm run dev`, then check `GET /api/health`. Read
 [the contract](CONTRACT.md) and copy `.env.example` to `.env` to configure the key
-locally. The scaffold deliberately makes no provider requests. Model access must
-be verified with the hackathon account; don't silently change the selected models.
+locally. Analysis and voice now make real provider requests when invoked. Access
+to both requested models was checked with this hackathon account; don't silently
+change the selected models.
 
 ## First 30 minutes: remove the two biggest uncertainties
 
@@ -27,7 +33,7 @@ independently of Person A. Tell Person A how to mount it rather than both editin
 
 ## Implement analysis
 
-Replace `server/analysis/analyze.ts`. Preserve its function signature.
+The implementation lives in `server/analysis/analyze.ts`. Preserve its function signature.
 
 - Send the chosen exercise, a reviewed exercise rubric, and ordered timestamped
   `input_image` frames to Astra via the Responses API. Keep the provider key in
@@ -49,14 +55,13 @@ Replace `server/analysis/analyze.ts`. Preserve its function signature.
   fallback. Avoid logging raw footage, keys, or full provider error bodies.
 - Update `/api/health` capability values when the implementation changes. A key
   being present is configuration, not proof of model access.
-- Replace the scaffold's two 501-expectation tests in `tests/api.test.ts` as each
-  service is implemented. Test provider success/error responses with controlled
+- Keep missing-key expectations in `tests/api.test.ts`. Test provider success/error responses with controlled
   mocks; keep ordinary `npm test` independent of API keys and network access.
 
 ## Implement voice end to end
 
-Replace `server/live/create-session.ts` and `src/features/voice/coach-client.ts`
-without changing the browser adapter's public interface.
+The implementation lives in `server/live/create-session.ts` and
+`src/features/voice/coach-client.ts`. Preserve the browser adapter's public interface.
 
 Server:
 

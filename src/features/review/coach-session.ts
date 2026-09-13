@@ -8,10 +8,13 @@ export function createCoachSession(connect: (options: CoachOptions) => Promise<C
   let pending: Promise<void> | null = null;
   let stopping: Promise<void> | null = null;
   let context: CoachContext | null = null;
+  let controller: AbortController | null = null;
 
   function start(options: CoachOptions): Promise<void> {
     if (pending || connection || stopping) return pending ?? stopping ?? Promise.resolve();
     const generation = ++epoch;
+    controller = new AbortController();
+    const signal = options.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal;
     context = options.context;
     const active = () => epoch === generation;
     let setupError: unknown;
@@ -19,8 +22,14 @@ export function createCoachSession(connect: (options: CoachOptions) => Promise<C
       let result: CoachConnection;
       try { result = await connect({
         context: options.context,
+        signal,
         onCommand: command => { if (active()) options.onCommand(command); },
-        onStatus: status => { if (active()) options.onStatus(status); },
+        onStatus: status => {
+          if (!active()) return;
+          if (!pending && (status === 'idle' || status === 'error')) connection = null;
+          options.onStatus(status);
+        },
+        onError: message => { if (active()) options.onError?.(message); },
         onTranscript: entry => { if (active()) options.onTranscript(entry); },
       }); } catch (error) { if (active()) epoch++; setupError = error; return; }
       if (!active()) { await result.disconnect(); return; }
@@ -34,6 +43,7 @@ export function createCoachSession(connect: (options: CoachOptions) => Promise<C
   function stop(): Promise<void> {
     if (stopping) return stopping;
     epoch++;
+    if (pending) controller?.abort();
     const old = connection;
     // A late setup must disconnect itself before a replacement can start.
     stopping = (async () => {

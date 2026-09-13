@@ -44,7 +44,8 @@ export default {
     const path = new URL(request.url).pathname;
     try {
       if (path === '/api/health' && request.method === 'GET') {
-        return json({ ok: true, analysis: env.OPENAI_API_KEY?.trim() ? 'configured' : 'not_configured', voice: 'not_implemented' });
+        const state = env.OPENAI_API_KEY?.trim() ? 'configured' : 'missing_api_key';
+        return json({ ok: true, analysis: state, voice: state, providerAccess: 'not_verified', models: { analysis: env.ASTRA_MODEL || 'gpt-6-astra', voice: env.LIVE_MODEL || 'gpt-live-1' } });
       }
       if (path === '/api/demo-report' && request.method === 'GET') return json(demoReport);
       if (path === '/api/analyze' && request.method === 'POST') {

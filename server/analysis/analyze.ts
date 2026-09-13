@@ -1,90 +1,61 @@
-import { z } from 'zod';
-import { AnalysisReportSchema, CorrectionSchema, validateReportForRequest, type AnalysisRequest, type AnalysisReport } from '../../shared/contracts';
+import { validateReportForRequest, type AnalysisRequest, type AnalysisReport } from '../../shared/contracts';
 import type { Env } from '../env';
 import { ServiceError } from '../errors';
-
-import { ANALYSIS_INSTRUCTIONS } from './prompt';
-
-// Reuse contract fields; the server assigns identities and evidence timestamps.
-const FindingSchema = z.object({
-  ...CorrectionSchema.omit({ id: true, evidence: true }).shape,
-  evidence: z.array(CorrectionSchema.shape.evidence.element.omit({ timestampSec: true })).min(1).max(4),
-});
-const FindingsSchema = z.object({
-  summary: AnalysisReportSchema.shape.summary,
-  visibility: AnalysisReportSchema.shape.visibility,
-  targetMuscles: AnalysisReportSchema.shape.targetMuscles,
-  nextAttemptFocus: AnalysisReportSchema.shape.nextAttemptFocus,
-  corrections: z.array(FindingSchema).max(3),
-});
-// JSON Schema supplies structural constraints; Zod also checks refinements.
-const outputSchema = z.toJSONSchema(FindingsSchema, { target: 'draft-7' });
-const EnvelopeSchema = z.object({
-  status: z.string(),
-  output: z.array(z.object({
-    type: z.string(),
-    content: z.array(z.object({ type: z.string(), text: z.string().optional() })).optional(),
-  })),
-});
+import { openaiPost, requireApiKey } from '../openai';
+import { AnalysisDraftSchema, analysisJsonSchema, ResponseEnvelopeSchema } from './schema';
+import { ANALYSIS_INSTRUCTIONS, CURL_TARGET_MUSCLES } from './rubric';
 
 export async function analyzeClip(request: AnalysisRequest, env: Env): Promise<AnalysisReport> {
-  if (!env.OPENAI_API_KEY?.trim()) {
-    throw new ServiceError(503, 'ANALYSIS_NOT_CONFIGURED', 'Set OPENAI_API_KEY in the project-root .env and restart the dev server (or configure the hosted server secret).');
+  requireApiKey(env);
+  // Reject obviously malformed bytes before paying for provider decoding.
+  // OpenAI still performs actual image decoding; this is not a complete JPEG decoder.
+  for (const frame of request.frames) {
+    let image: string;
+    try { image = atob(frame.dataUrl.split(',')[1]); }
+    catch { throw new ServiceError(400, 'INVALID_IMAGE', 'A frame is not valid base64 JPEG data.'); }
+    if (image.length < 4 || image.charCodeAt(0) !== 255 || image.charCodeAt(1) !== 216 || image.charCodeAt(image.length - 2) !== 255 || image.charCodeAt(image.length - 1) !== 217) {
+      throw new ServiceError(400, 'INVALID_IMAGE', 'A frame is not a complete JPEG. Extract the clip frames again.');
+    }
   }
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 90_000);
+  const content: Array<Record<string, unknown>> = [{
+    type: 'input_text',
+    text: `Exercise: conventional dumbbell curl. Duration: ${request.durationSec}s. There are ${request.frames.length} ordered frames. Only indices 0 through ${request.frames.length - 1} exist.`,
+  }];
+  request.frames.forEach((frame, index) => content.push(
+    { type: 'input_text', text: `Frame ${index}; timestamp ${frame.timestampSec}s; image ${frame.width}x${frame.height}.` },
+    { type: 'input_image', image_url: frame.dataUrl, detail: 'high' },
+  ));
+  const raw = await openaiPost('/responses', {
+    model: env.ASTRA_MODEL || 'gpt-6-astra',
+    instructions: ANALYSIS_INSTRUCTIONS,
+    input: [{ role: 'user', content }],
+    reasoning: { effort: 'low' },
+    max_output_tokens: 6000,
+    store: false,
+    text: { format: { type: 'json_schema', name: 'exercise_analysis', strict: true, schema: analysisJsonSchema } },
+  }, env);
+  const envelope = ResponseEnvelopeSchema.safeParse(raw);
+  if (!envelope.success) throw new ServiceError(502, 'INVALID_MODEL_OUTPUT', 'The analysis response was incomplete or unreadable.');
+  if (envelope.data.status !== 'completed') throw new ServiceError(502, 'ANALYSIS_INCOMPLETE', 'The analysis did not finish. Try a shorter clip.');
+  const parts = envelope.data.output.flatMap(item => item.content ?? []);
+  if (parts.some(part => part.type === 'refusal')) throw new ServiceError(422, 'ANALYSIS_REFUSED', 'The model could not assess this clip. Try another exercise recording.');
   try {
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: env.ASTRA_MODEL ?? 'gpt-6-astra', store: false,
-        instructions: ANALYSIS_INSTRUCTIONS,
-        input: [{ role: 'user', content: [
-          { type: 'input_text', text: `Exercise: ${request.exerciseId}. Duration: ${request.durationSec} seconds. Review these ${request.frames.length} ordered sampled frames.` },
-          ...request.frames.flatMap((frame, frameIndex) => [
-            { type: 'input_text', text: `Frame index ${frameIndex}; timestamp ${frame.timestampSec} seconds.` },
-            { type: 'input_image', image_url: frame.dataUrl, detail: 'high' },
-          ]),
-        ] }],
-        text: { format: { type: 'json_schema', name: 'curl_findings', strict: true, schema: outputSchema } },
-      }),
-    });
-    if (!response.ok) {
-      await response.body?.cancel();
-      if ([401, 403, 404].includes(response.status)) throw new ServiceError(503, 'ASTRA_ACCESS_ERROR', 'Check the server API key and account access to the configured Astra model.');
-      if (response.status === 429) throw new ServiceError(429, 'ASTRA_RATE_LIMITED', 'Astra is rate limited or the account quota is exhausted. Check API billing/quota and retry shortly.');
-      if (response.status === 400) throw new ServiceError(502, 'ASTRA_REQUEST_REJECTED', 'Astra rejected the analysis request. Check model compatibility and try another clip with valid JPEG frames.');
-      throw new ServiceError(502, 'ASTRA_UNAVAILABLE', 'Astra could not complete the analysis. Please retry shortly.');
-    }
-    try {
-      const envelope = EnvelopeSchema.parse(await response.json());
-      const content = envelope.output.filter(item => item.type === 'message').flatMap(item => item.content ?? []);
-      if (content.some(item => item.type === 'refusal')) throw new ServiceError(422, 'ANALYSIS_REFUSED', 'Astra could not review this clip. Try a clear recording of a dumbbell curl.');
-      if (envelope.status !== 'completed') throw new Error('Incomplete response');
-      const findings = FindingsSchema.parse(JSON.parse(content.filter(item => item.type === 'output_text').map(item => item.text ?? '').join('')));
-      return validateReportForRequest({
-        ...findings, schemaVersion: '1', id: crypto.randomUUID(), source: 'astra',
-        clipId: request.clipId, exerciseId: request.exerciseId, durationSec: request.durationSec,
-        corrections: findings.corrections.map((correction, index) => ({
-          ...correction, id: `correction-${index + 1}`,
-          evidence: correction.evidence.map(evidence => {
-            const frame = request.frames[evidence.frameIndex];
-            if (!frame) throw new Error('Unknown frame');
-            return { ...evidence, timestampSec: frame.timestampSec };
-          }),
-        })),
-      }, request);
-    } catch (error) {
-      if (controller.signal.aborted || error instanceof ServiceError) throw error;
-      throw new ServiceError(502, 'INVALID_MODEL_OUTPUT', 'Astra returned an incomplete or invalid report. Please retry the analysis.');
-    }
-  } catch (error) {
-    if (controller.signal.aborted) throw new ServiceError(504, 'ASTRA_TIMEOUT', 'Astra analysis timed out. Please retry.');
-    if (error instanceof ServiceError) throw error;
-    throw new ServiceError(502, 'ASTRA_CONNECTION_ERROR', 'Could not reach Astra. Check the server network connection and retry.');
-  } finally {
-    clearTimeout(timeout);
+    const draft = AnalysisDraftSchema.parse(JSON.parse(parts.filter(p => p.type === 'output_text').map(p => p.text ?? '').join('')));
+    const report = {
+      ...draft, schemaVersion: '1', id: crypto.randomUUID(), clipId: request.clipId,
+      exerciseId: request.exerciseId, durationSec: request.durationSec, source: 'astra',
+      targetMuscles: CURL_TARGET_MUSCLES,
+      corrections: draft.corrections.map((correction, i) => ({
+        ...correction, id: `correction-${i + 1}`,
+        evidence: correction.evidence.map(evidence => {
+          const frame = request.frames[evidence.frameIndex];
+          if (!frame) throw new Error('Nonexistent evidence frame.');
+          return { ...evidence, timestampSec: frame.timestampSec };
+        }),
+      })),
+    };
+    return validateReportForRequest(report, request);
+  } catch {
+    throw new ServiceError(502, 'INVALID_MODEL_OUTPUT', 'The model returned unsupported findings or evidence. Please retry.');
   }
 }

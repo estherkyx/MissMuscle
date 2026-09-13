@@ -2,6 +2,7 @@ import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'reac
 import type { CoachCommand, CoachContext } from '../../../shared/contracts';
 import { connectCoach, type CoachStatus } from '../voice/coach-client';
 import { createCoachSession } from './coach-session';
+import { appendTranscript, type TranscriptFragment } from './transcript';
 
 export interface CoachPanelHandle { stop(): Promise<void> }
 interface Props {
@@ -21,8 +22,7 @@ export function CoachPanel({ ref, context, onCommand }: Props) {
   const [busy, setBusy] = useState(false);
   const [active, setActive] = useState(false);
   const [error, setError] = useState('');
-  const [transcript, setTranscript] = useState<Array<{ role: 'user' | 'coach'; text: string }>>([]);
-  const [interim, setInterim] = useState<{ role: 'user' | 'coach'; text: string } | null>(null);
+  const [transcript, setTranscript] = useState<TranscriptFragment[]>([]);
 
   async function stop() {
     uiEpoch.current++;
@@ -33,7 +33,7 @@ export function CoachPanel({ ref, context, onCommand }: Props) {
       if (mounted.current) setError(e instanceof Error ? e.message : 'Could not finish ending the coach session.');
       throw e;
     } finally {
-      if (mounted.current) { setStatus(ended ? 'idle' : 'error'); setActive(!ended); setBusy(false); setInterim(null); }
+      if (mounted.current) { setStatus(ended ? 'idle' : 'error'); setActive(!ended); setBusy(false); }
     }
   }
   useImperativeHandle(ref, () => ({ stop }));
@@ -50,16 +50,17 @@ export function CoachPanel({ ref, context, onCommand }: Props) {
   async function start() {
     if (!latest.current.context || busy || active) return;
     const generation = ++uiEpoch.current;
-    setBusy(true); setStatus('connecting'); setError(''); setTranscript([]); setInterim(null);
+    setBusy(true); setStatus('connecting'); setError(''); setTranscript([]);
     try {
       await session.current!.start({
         context: latest.current.context,
         onCommand: command => latest.current.onCommand(command),
-        onStatus: setStatus,
-        onTranscript: entry => {
-          if (entry.final) { setTranscript(previous => [...previous, { role: entry.role, text: entry.text }].slice(-100)); setInterim(null); }
-          else setInterim(entry);
+        onStatus: next => {
+          setStatus(next);
+          if (next === 'idle' || next === 'error') setActive(false);
         },
+        onError: setError,
+        onTranscript: entry => setTranscript(previous => appendTranscript(previous, entry)),
       });
       if (mounted.current && generation === uiEpoch.current) setActive(true);
     } catch (e) {
@@ -67,19 +68,12 @@ export function CoachPanel({ ref, context, onCommand }: Props) {
     } finally { if (mounted.current && generation === uiEpoch.current) setBusy(false); }
   }
 
-  return <section className="coach-panel" aria-labelledby="coach-title">
-    <div className="section-heading"><h3 id="coach-title">Talk it through</h3><span className="status" role="status">{busy && status !== 'connecting' ? 'Ending…' : status}</span></div>
-    <p className="muted">Ask “Show me where you noticed that.” The coach uses your current report and playback position.</p>
-    {context?.report.source === 'fixture' && <p className="sample-badge">Voice discussion would use fictional sample findings.</p>}
-    <div className="actions">
-      <button onClick={() => void start()} disabled={!context || busy || active}>Start voice coach</button>
-      <button className="secondary" onClick={() => { void stop().catch(() => {}); }} disabled={!active && status !== 'connecting'}>End session</button>
+  return <section className="coach-panel" aria-label="Voice coach">
+    <div className="coach-controls"><span className="voice-indicator" aria-hidden="true">◖◗</span><div className="voice-label"><strong>Talk to your coach</strong><span role="status">{busy && status !== 'connecting' ? 'Ending…' : status === 'idle' ? context ? 'Ask “Show me where”' : 'Ready after analysis' : status}</span></div>
+      {active || status === 'connecting' ? <button className="secondary small-button" onClick={() => { void stop().catch(() => {}); }} disabled={busy && status !== 'connecting'}>End voice</button> : <button className="secondary small-button" onClick={() => void start()} disabled={!context || busy}>Start voice</button>}
     </div>
-    {!context && <p className="muted">Load a clip and a report to start voice coaching.</p>}
+    {context?.report.source === 'fixture' && <span className="sample-badge">Voice uses fictional sample findings</span>}
     {error && <p role="alert" className="error">{error}</p>}
-    <div className="transcript" role="log" aria-label="Coach conversation" aria-live="polite">
-      {transcript.map((entry, index) => <p key={index}><strong>{entry.role === 'user' ? 'You' : 'Coach'}:</strong> {entry.text}</p>)}
-      {interim && <p className="muted"><strong>{interim.role === 'user' ? 'You' : 'Coach'}:</strong> {interim.text} <small>(speaking)</small></p>}
-    </div>
+    {!!transcript.length && <details className="conversation"><summary>Conversation</summary><div className="transcript" role="log" aria-label="Coach conversation" aria-live="polite">{transcript.map((entry, index) => <p key={index}><strong>{entry.role === 'user' ? 'You' : 'Coach'}:</strong> {entry.text}</p>)}</div></details>}
   </section>;
 }

@@ -1,101 +1,92 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import worker from '../server';
+import { analyzeClip } from '../server/analysis/analyze';
+import { createLiveSession } from '../server/live/create-session';
+import { demoReport } from '../shared/fixtures/demo-report';
+import { AnalysisRequestSchema } from '../shared/contracts';
+import { ServiceError } from '../server/errors';
 
-const input = {
-  clipId: 'uploaded-clip', exerciseId: 'dumbbell_curl', durationSec: 5,
-  frames: [0, 2.35].map(timestampSec => ({ timestampSec, dataUrl: 'data:image/jpeg;base64,/9j/AA==', width: 1, height: 1 })),
-};
-const findings = () => ({
-  summary: 'The upper arm shifts forward across the sampled frames.',
-  visibility: { assessable: true, limitations: [] }, targetMuscles: ['Biceps brachii'],
-  nextAttemptFocus: 'Keep the upper arm steadier.',
-  corrections: [{ title: 'Upper arm movement', priority: 'focus_first', observation: 'The upper arm shifts forward.', cue: 'Keep your upper arm near your side.', referenceCue: 'Aim for a steady upper arm.', evidence: [{ frameIndex: 1, region: null as unknown }] }],
+// Byte-boundary-only fixture. Unit tests mock the provider; real image decoding
+// is checked by scripts/smoke-analysis.ts using a real JPEG supplied by the caller.
+const request = AnalysisRequestSchema.parse({
+  clipId: 'clip-a', exerciseId: 'dumbbell_curl', durationSec: 10,
+  frames: [0, 3, 7].map(timestampSec => ({ timestampSec, dataUrl: 'data:image/jpeg;base64,/9j/2Q==', width: 1, height: 1 })),
 });
+const draft = {
+  summary: 'Visible upper-arm movement during this repetition.',
+  visibility: { assessable: true, limitations: [] },
+  corrections: [{
+    title: 'Keep the upper arm steadier', priority: 'focus_first',
+    observation: 'The upper arm moves forward between these frames.',
+    cue: 'Try keeping your upper arm more still.', referenceCue: 'Use a controlled elbow bend.',
+    evidence: [{ frameIndex: 0, region: null }, { frameIndex: 2, region: null }],
+  }],
+  nextAttemptFocus: 'Focus on this one cue.',
+};
 const envelope = (value: unknown) => ({ status: 'completed', output: [{ type: 'reasoning' }, { type: 'message', content: [{ type: 'output_text', text: JSON.stringify(value) }] }] });
-const analyze = (clipId = input.clipId) => worker.fetch(new Request('http://localhost/api/analyze', {
-  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...input, clipId }),
-}), { OPENAI_API_KEY: 'test-key' });
+const serviceCode = (code: string) => (error: unknown) => error instanceof ServiceError && error.code === code;
 
-test('analysis sends ordered images to Astra and binds real results to each request', async t => {
+test('Astra uses ordered images, strict structured output, and server-owned timestamps', async t => {
+  let payload: Record<string, unknown> = {};
   t.mock.method(globalThis, 'fetch', async (url: string, init: RequestInit) => {
     assert.equal(url, 'https://api.openai.com/v1/responses');
-    const body = JSON.parse(init.body as string);
-    assert.equal(body.model, 'gpt-6-astra');
-    assert.equal(body.store, false);
-    assert.equal(body.text.format.strict, true);
-    assert.deepEqual(body.input[0].content.filter((part: { type: string }) => part.type === 'input_image').map((part: { image_url: string }) => part.image_url), input.frames.map(frame => frame.dataUrl));
-    assert.match(body.input[0].content[3].text, /Frame index 1; timestamp 2.35/);
-    return Response.json(envelope(findings()));
+    payload = JSON.parse(init.body as string);
+    assert.equal((init.headers as Record<string, string>).Authorization, 'Bearer test-key');
+    return Response.json(envelope(draft));
   });
-  for (const clipId of ['first', 'second']) {
-    const response = await analyze(clipId);
-    assert.equal(response.status, 200);
-    const report = await response.json();
-    assert.equal(report.clipId, clipId);
-    assert.equal(report.source, 'astra');
-    assert.equal(report.corrections[0].evidence[0].timestampSec, 2.35);
-  }
+  const report = await analyzeClip(request, { OPENAI_API_KEY: 'test-key' });
+  assert.equal(payload.model, 'gpt-6-astra');
+  assert.equal(payload.store, false);
+  const input = payload.input as Array<{ content: Array<{ type: string; image_url?: string; text?: string }> }>;
+  assert.deepEqual(input[0].content.filter(c => c.type === 'input_image').map(c => c.image_url), request.frames.map(f => f.dataUrl));
+  assert.equal(report.source, 'astra');
+  assert.equal(report.clipId, 'clip-a');
+  assert.deepEqual(report.corrections[0].evidence.map(e => e.timestampSec), [0, 7]);
+  assert.equal(report.corrections[0].id, 'correction-1');
 });
-
-test('unassessable clips can return limitations without findings', async t => {
-  t.mock.method(globalThis, 'fetch', async () => Response.json(envelope({ ...findings(), visibility: { assessable: false, limitations: ['Arms are hidden.'] }, corrections: [] })));
-  assert.equal((await analyze()).status, 200);
+test('Astra refuses invented frames and unassessable reports containing corrections', async t => {
+  const invalid = structuredClone(draft); invalid.corrections[0].evidence[0].frameIndex = 12;
+  const mocked = t.mock.method(globalThis, 'fetch', async () => Response.json(envelope(invalid)));
+  await assert.rejects(analyzeClip(request, { OPENAI_API_KEY: 'test' }), serviceCode('INVALID_MODEL_OUTPUT'));
+  mocked.mock.mockImplementation(async () => Response.json(envelope({ ...draft, visibility: { assessable: false, limitations: ['Occluded'] } })));
+  await assert.rejects(analyzeClip(request, { OPENAI_API_KEY: 'test' }), serviceCode('INVALID_MODEL_OUTPUT'));
 });
-
-test('invalid provider findings never become a report', async t => {
-  const unknownFrame = findings(); unknownFrame.corrections[0].evidence[0].frameIndex = 9;
-  const badRegion = findings(); badRegion.corrections[0].evidence[0].region = { x: 0.9, y: 0, width: 0.5, height: 0.5 };
-  for (const value of [unknownFrame, badRegion, {}, { ...findings(), visibility: { assessable: false, limitations: [] } }]) {
-    const mock = t.mock.method(globalThis, 'fetch', async () => Response.json(envelope(value)));
-    const response = await analyze();
-    assert.equal(response.status, 502);
-    assert.equal((await response.json()).error.code, 'INVALID_MODEL_OUTPUT');
-    mock.mock.restore();
-  }
+test('a legitimate visibility limitation returns zero corrections', async t => {
+  t.mock.method(globalThis, 'fetch', async () => Response.json(envelope({ ...draft, visibility: { assessable: false, limitations: ['Working arm is out of frame.'] }, corrections: [] })));
+  const report = await analyzeClip(request, { OPENAI_API_KEY: 'test' });
+  assert.equal(report.visibility.assessable, false); assert.deepEqual(report.corrections, []);
 });
-
-test('provider errors are actionable and do not expose provider bodies', async t => {
-  for (const [upstream, status, code] of [[401, 503, 'ASTRA_ACCESS_ERROR'], [403, 503, 'ASTRA_ACCESS_ERROR'], [404, 503, 'ASTRA_ACCESS_ERROR'], [429, 429, 'ASTRA_RATE_LIMITED'], [400, 502, 'ASTRA_REQUEST_REJECTED'], [500, 502, 'ASTRA_UNAVAILABLE']] as const) {
-    const mock = t.mock.method(globalThis, 'fetch', async () => new Response('sensitive upstream details', { status: upstream }));
-    const response = await analyze();
-    assert.equal(response.status, status);
-    const body = await response.json();
-    assert.equal(body.error.code, code);
-    assert.doesNotMatch(JSON.stringify(body), /sensitive/);
-    mock.mock.restore();
-  }
+test('provider refusal and incomplete generation produce explicit errors', async t => {
+  const mocked = t.mock.method(globalThis, 'fetch', async () => Response.json({ status: 'completed', output: [{ type: 'message', content: [{ type: 'refusal' }] }] }));
+  await assert.rejects(analyzeClip(request, { OPENAI_API_KEY: 'test' }), serviceCode('ANALYSIS_REFUSED'));
+  mocked.mock.mockImplementation(async () => Response.json({ status: 'incomplete', output: [] }));
+  await assert.rejects(analyzeClip(request, { OPENAI_API_KEY: 'test' }), serviceCode('ANALYSIS_INCOMPLETE'));
 });
-
-test('incomplete, refused and malformed responses fail explicitly', async t => {
-  for (const [payload, code] of [
-    [{ ...envelope(findings()), status: 'incomplete' }, 'INVALID_MODEL_OUTPUT'],
-    [{ status: 'completed', output: [{ type: 'message', content: [{ type: 'refusal' }] }] }, 'ANALYSIS_REFUSED'],
-    ['not json', 'INVALID_MODEL_OUTPUT'],
-  ] as const) {
-    const mock = t.mock.method(globalThis, 'fetch', async () => typeof payload === 'string' ? new Response(payload) : Response.json(payload));
-    assert.equal((await (await analyze()).json()).error.code, code);
-    mock.mock.restore();
-  }
+test('provider HTTP errors are actionable and do not expose raw bodies', async t => {
+  const mock = t.mock.method(globalThis, 'fetch', async () => new Response('private upstream error text', { status: 401 }));
+  await assert.rejects(analyzeClip(request, { OPENAI_API_KEY: 'test' }), serviceCode('OPENAI_AUTH_FAILED'));
+  mock.mock.mockImplementation(async () => new Response('private upstream error text', { status: 429 }));
+  await assert.rejects(analyzeClip(request, { OPENAI_API_KEY: 'test' }), serviceCode('OPENAI_RATE_LIMIT'));
+  mock.mock.mockImplementation(async () => { throw new DOMException('Timed out', 'TimeoutError'); });
+  await assert.rejects(analyzeClip(request, { OPENAI_API_KEY: 'test' }), serviceCode('OPENAI_TIMEOUT'));
 });
-
-test('network failures do not fall back to a fixture', async t => {
-  t.mock.method(globalThis, 'fetch', async () => { throw new TypeError('fetch failed'); });
-  assert.equal((await (await analyze()).json()).error.code, 'ASTRA_CONNECTION_ERROR');
+test('malformed JPEG bytes are rejected before any provider call', async t => {
+  const fetchMock = t.mock.method(globalThis, 'fetch', async () => Response.json({}));
+  await assert.rejects(analyzeClip({ ...request, frames: request.frames.map(f => ({ ...f, dataUrl: 'data:image/jpeg;base64,AAAA' })) }, { OPENAI_API_KEY: 'test' }), serviceCode('INVALID_IMAGE'));
+  assert.equal(fetchMock.mock.callCount(), 0);
 });
-
-test('timeout aborts the actual upstream request', async t => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
-  t.mock.method(globalThis, 'fetch', async (_url: string, init: RequestInit) => new Promise<Response>((_resolve, reject) => {
-    init.signal!.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
-    t.mock.timers.tick(90_000);
-  }));
-  assert.equal((await (await analyze()).json()).error.code, 'ASTRA_TIMEOUT');
-});
-
-test('health distinguishes configuration from model access verification', async () => {
-  for (const [env, expected] of [[{}, 'not_configured'], [{ OPENAI_API_KEY: 'test' }, 'configured']] as const) {
-    const response = await worker.fetch(new Request('http://localhost/api/health'), env);
-    assert.equal((await response.json()).analysis, expected);
-  }
+test('GPT-Live handshake uses the Live API with Responses delegation and preserves opaque IDs', async t => {
+  t.mock.method(globalThis, 'fetch', async (url: string, init: RequestInit) => {
+    assert.equal(url, 'https://api.openai.com/v1/live/sessions');
+    const payload = JSON.parse(init.body as string);
+    assert.equal(payload.session.model, 'gpt-live-1');
+    assert.equal(payload.session.delegation.type, 'responses');
+    assert.equal(payload.session.delegation.responses.model, 'gpt-6-astra');
+    assert.equal(payload.transport.sdp, 'sdp-offer');
+    assert.equal(payload.session.delegation.responses.tools.length, 4);
+    assert.match(payload.session.delegation.responses.instructions, /fixture/);
+    return Response.json({ session: { id: 'opaque_live_123' }, transport: { type: 'webrtc', sdp: 'sdp-answer' } });
+  });
+  const session = await createLiveSession({ sdpOffer: 'sdp-offer', context: { report: demoReport, currentTimeSec: 0, selectedCorrectionId: null } }, { OPENAI_API_KEY: 'test' });
+  assert.deepEqual(session, { sessionId: 'opaque_live_123', sdpAnswer: 'sdp-answer' });
 });

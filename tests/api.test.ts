@@ -17,17 +17,17 @@ test('invalid analysis input fails before calling a provider', async () => {
   assert.equal(response.status, 400);
   assert.equal((await response.json() as { error: { code: string } }).error.code, 'INVALID_REQUEST');
 });
-test('analysis without a key returns a configuration error instead of fabricated findings', async () => {
+test('missing analysis key gets explicit 503 instead of fabricated findings', async () => {
   const response = await worker.fetch(post('/api/analyze', {
     clipId: 'test', exerciseId: 'dumbbell_curl', durationSec: 5,
     frames: [0, 2].map(timestampSec => ({ timestampSec, dataUrl: 'data:image/jpeg;base64,/9j/AA==', width: 1, height: 1 })),
   }));
   assert.equal(response.status, 503);
-  assert.equal((await response.json() as { error: { code: string } }).error.code, 'ANALYSIS_NOT_CONFIGURED');
+  assert.equal((await response.json() as { error: { code: string } }).error.code, 'OPENAI_KEY_MISSING');
 });
-test('unfinished voice integration does not create a fake session', async () => {
+test('missing voice key does not create a fake session', async () => {
   const response = await worker.fetch(post('/api/live/session', { sdpOffer: 'test-offer', context: { report: demoReport, currentTimeSec: 0, selectedCorrectionId: null } }));
-  assert.equal(response.status, 501);
+  assert.equal(response.status, 503);
 });
 test('unknown API routes stay JSON errors instead of falling through to SPA', async () => {
   const response = await worker.fetch(new Request('http://localhost/api/missing'), { ASSETS: { fetch: async () => new Response('<html>app</html>') } });

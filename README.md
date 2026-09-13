@@ -8,7 +8,18 @@ that”** → the coach brings up the relevant moment and explains the evidence.
 
 ## Start here
 
-This is a **working development scaffold**, not the completed AI app.
+The **video/review interface, Astra analysis service, and GPT-Live voice adapter
+are integrated locally**. Real exercise-flow acceptance and Sites deployment remain.
+See [current verification and next steps](docs/PERSON_B_STATUS.md).
+
+The interface starts with an exercise selector. Dumbbell curl
+(biceps) supports analysis. Lat pulldown (lats), leg extension (quadriceps), and
+dumbbell front squat (quadriceps and glutes) have reference sheets only. Each sheet
+includes an original schematic, muscle guide, and linked technique sources.
+Selecting a reference-only exercise clears old findings and disables upload and
+analysis. The server contract remains curl-only. Video is the main review surface
+for curls; correction rows below it seek to evidence, compact voice controls sit
+beside the video actions, and form/muscle references live at the bottom.
 
 ```sh
 npm ci
@@ -20,7 +31,7 @@ needed. The sample is fictional and visibly labelled. API requests use the same
 origin as the interface. Changes to `server/` reload during local development.
 
 Use Node 22.12+ (the `.nvmrc` selects Node 22). Person B can copy `.env.example` to
-`.env` and set `OPENAI_API_KEY` locally when connecting the providers. Restart the
+`.env` and set `OPENAI_API_KEY` locally to use the providers. Restart the
 dev server after changing environment variables. Never put a key in a `VITE_*`
 variable: those variables can reach the browser bundle.
 
@@ -98,12 +109,18 @@ reconstruction, workout history/accounts, arbitrary gym machines, and image gene
 - Typed analysis client, voice interface, and typed playback commands.
 - API errors and payload limits; contract and route tests.
 - Separate browser and server production bundles.
+- Real Astra image analysis with strict structured output, a conservative curl
+  rubric, and server-derived evidence timestamps.
+- Real GPT-Live WebRTC audio with report-grounded delegation to Astra, validated
+  playback commands, context updates, and graceful session shutdown.
+- An isolated [voice test page](src/features/voice/dev.html), served by the dev
+  server at `/src/features/voice/dev.html`; it uses real voice and a labelled
+  fictional report unless you import a real one.
 
-What remains: video upload/extraction, visual overlays/reference assets, real Astra
-calls, real GPT-Live audio and command handling, comparison, and Sites deployment.
-Analysis now calls Astra with ordered images and structured output. Set
-OPENAI_API_KEY in the project-root .env and restart the dev server. Account model
-access still needs verification. Voice remains **501 Not Implemented**.
+The app now includes video upload/frame extraction, evidence review, reference
+illustrations, and voice controls. What remains is testing the combined flow on
+actual exercise clips and Sites deployment. Comparison is optional. Missing keys or provider failures return
+explicit errors; they never produce a sample report as a fallback.
 
 ## Structure
 
@@ -118,11 +135,13 @@ src/
   lib/api.ts                 Shared: validated HTTP client
 server/
   index.ts                   Person B: HTTP routing and boundary validation
-  analysis/analyze.ts        Person B: Astra image analysis
-  live/create-session.ts     Person B: GPT-Live handshake (stub)
+  analysis/analyze.ts        Person B: Astra integration
+  live/create-session.ts     Person B: GPT-Live handshake
   env.ts                     Server runtime bindings
 shared/
   contracts.ts               Shared: single source of truth for interfaces
+  coach-config.ts            Shared: voice instructions and playback tool definitions
+  curl-reference.ts          Shared: versioned curl criteria for analysis and UI
   fixtures/demo-report.ts    Explicit synthetic UI fixture
 scripts/dev-api.ts           Local Node-to-Web Request adapter
 tests/                      Contract and HTTP boundary checks
@@ -138,8 +157,9 @@ steps and the five-hour schedule are in [integration and demo](docs/INTEGRATION.
 
 Use Astra for ordered image analysis. Its documented modalities include images,
 but not direct video input. GPT-Live-1 handles speech; it does not accept images or
-video. The voice backend receives the report and playback context and delegates
-further visual questions to Astra when necessary.
+video. The voice backend delegates report questions and playback actions to Astra
+with the report and playback context. It cannot inspect additional images during
+the voice conversation yet; questions needing unseen evidence get that limitation.
 
 Keep original video in the browser for this MVP. Send only selected frames for
 analysis, with an explicit user action. The starter has no persistent storage.
