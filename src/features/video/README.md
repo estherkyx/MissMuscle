@@ -152,5 +152,3 @@ Missing landmarks or multiple people hide the reference, with no independent loo
 or sample fallback. Seeking resets direction history. Torso and upper-arm reference
 positions remain authored. Camera projection and partial range can affect timing;
 this is approximate phase matching, not measured anatomical speed or a prescription.
-
-

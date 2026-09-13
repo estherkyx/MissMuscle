@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { FormCriterionIdSchema, FormStatusSchema } from '../../shared/contracts';
 
 // Provider output excludes IDs/timestamps/clip metadata: the server owns those.
 // No refinements here; the shared report validator applies geometric/temporal checks.
@@ -8,6 +9,12 @@ export const AnalysisDraftSchema = z.object({
     assessable: z.boolean(),
     limitations: z.array(z.string().min(1).max(300)).max(6),
   }),
+  formChecks: z.array(z.object({
+    criterionId: FormCriterionIdSchema,
+    status: FormStatusSchema,
+    note: z.string().min(1).max(250),
+    evidence: z.array(z.object({ frameIndex: z.number().int().min(0).max(15) })).max(4),
+  })).length(5),
   corrections: z.array(z.object({
     title: z.string().min(1).max(100),
     priority: z.enum(['focus_first', 'practice_next']),
