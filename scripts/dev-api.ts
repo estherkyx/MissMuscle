@@ -8,6 +8,9 @@ type Worker = { fetch(request: Request, env: Env): Promise<Response> };
 export function apiMiddleware(loadWorker: () => Promise<Worker>, env: Env) {
   return async (req: IncomingMessage, res: ServerResponse, next: () => void) => {
     if (!req.url?.startsWith('/api/')) return next();
+    const abort = new AbortController();
+    const disconnected = () => { if (!res.writableEnded) abort.abort(); };
+    res.on('close', disconnected);
     try {
       const chunks: Buffer[] = [];
       let size = 0;
@@ -29,14 +32,19 @@ export function apiMiddleware(loadWorker: () => Promise<Worker>, env: Env) {
       const request = new Request(new URL(req.url, 'http://localhost'), {
         method: req.method,
         headers,
+        signal: abort.signal,
         ...(body.length ? { body: new Uint8Array(body) } : {}),
       });
       const response = await (await loadWorker()).fetch(request, env);
+      if (res.destroyed) return;
       res.writeHead(response.status, Object.fromEntries(response.headers));
       res.end(Buffer.from(await response.arrayBuffer()));
     } catch {
+      if (res.destroyed) return;
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: { code: 'DEV_SERVER_ERROR', message: 'Local API adapter failed.' } }));
+    } finally {
+      res.off('close', disconnected);
     }
   };
 }

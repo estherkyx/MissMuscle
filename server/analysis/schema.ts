@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { FormCriterionIdSchema, FormStatusSchema } from '../../shared/contracts';
+import { FormCriterionIdSchema, FormStatusSchema, type ExerciseId } from '../../shared/contracts';
+import { exerciseCriteria } from '../../shared/exercise-criteria';
 
 // Provider output excludes IDs/timestamps/clip metadata: the server owns those.
 // No refinements here; the shared report validator applies geometric/temporal checks.
@@ -41,3 +42,18 @@ export const ResponseEnvelopeSchema = z.object({
     content: z.array(z.object({ type: z.string(), text: z.string().optional() })).optional(),
   })),
 });
+
+// Live feedback avoids generating a second set of correction narratives. The
+// server expands verified checks into the unchanged public report contract.
+export function createLiveAnalysisDraftSchema(exerciseId: ExerciseId) {
+  const ids=exerciseCriteria[exerciseId].map(criterion=>criterion.id) as [string,...string[]];
+  return AnalysisDraftSchema.pick({summary:true,visibility:true,formChecks:true}).extend({
+  summary:z.string().min(1).max(160),
+  formChecks:z.array(AnalysisDraftSchema.shape.formChecks.element.extend({
+    criterionId:z.enum(ids),
+    note:z.string().min(1).max(160),
+    evidence:z.array(z.object({frameIndex:z.number().int().min(0).max(15)})).max(exerciseId==='leg_extension'||exerciseId==='dumbbell_front_squat'?3:2),
+  })).length(ids.length),
+});
+}
+export const liveAnalysisJsonSchema = (schema: ReturnType<typeof createLiveAnalysisDraftSchema>) => z.toJSONSchema(schema, { target: 'draft-7' });

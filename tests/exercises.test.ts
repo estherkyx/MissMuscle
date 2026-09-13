@@ -1,3 +1,4 @@
+import { coachingCueText, reviewSpeech } from '../src/features/live/coaching-cue';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../server';
@@ -110,7 +111,7 @@ test('leg extension completion is distinct from smoothness and requires endpoint
   const legFrames = [0, 1, 2].map(timestampSec => ({ ...frames[0], timestampSec }));
   for (const status of ['needs_attention', 'looks_consistent', 'unclear'] as const) {
     const note = status === 'needs_attention' ? 'Your knees remain bent at the top before you lower again.' : status === 'looks_consistent' ? 'Your legs straighten at the visible top of the rep.' : 'The top of the repetition is not visible.';
-    const evidence = status === 'needs_attention' ? [{ frameIndex: 0 }, { frameIndex: 1 }, { frameIndex: 2 }] : status === 'looks_consistent' ? [{ frameIndex: 0 }, { frameIndex: 1 }] : [];
+    const evidence = status === 'unclear' ? [] : [{ frameIndex: 0 }, { frameIndex: 1 }, { frameIndex: 2 }];
     const draft = {
       summary: 'Synthetic leg-extension completion assessment.', visibility: { assessable: true, limitations: status === 'unclear' ? [note] : [] },
       formChecks: checks(exercise).map(check => check.criterionId === 'full_extension' ? { ...check, status, note, evidence } : check.criterionId === 'smooth_extension' ? { ...check, status: 'looks_consistent', note: 'Movement is smooth in this synthetic response.', evidence: [{ frameIndex: 0 }, { frameIndex: 2 }] } : check),
@@ -119,7 +120,7 @@ test('leg extension completion is distinct from smoothness and requires endpoint
     };
     const mock = t.mock.method(globalThis, 'fetch', async (_url: string, init: RequestInit) => {
       const body = JSON.parse(init.body as string);
-      assert.match(body.instructions, /leg_extension-3/);
+      assert.match(body.instructions, /leg_extension-4/);
       assert.match(body.instructions, /Explicitly inspect full_extension separately from smooth_extension/);
       assert.match(body.instructions, /at least three ordered supplied moments/);
       assert.match(body.instructions, /Do not call a mid-repetition bent knee incomplete extension/);
@@ -138,6 +139,8 @@ test('leg extension completion is distinct from smoothness and requires endpoint
     assert.ok(html.includes(note));
     if (status === 'needs_attention') {
       assert.deepEqual(report.corrections[0].evidence.map(item => item.timestampSec), [0, 1, 2]);
+    }
+    if (status !== 'unclear') {
       const incomplete = structuredClone(report);
       incomplete.formChecks!.find(check => check.criterionId === 'full_extension')!.evidence.pop();
       assert.equal(AnalysisReportSchema.safeParse(incomplete).success, false);
@@ -165,7 +168,7 @@ test('squat depth flags a supported short rep independently of other form checks
     };
     const mock = t.mock.method(globalThis, 'fetch', async (_url: string, init: RequestInit) => {
       const body = JSON.parse(init.body as string);
-      assert.match(body.instructions, /dumbbell_front_squat-3/);
+      assert.match(body.instructions, /dumbbell_front_squat-4/);
       assert.match(body.instructions, /Explicitly inspect squat_depth independently/);
       assert.match(body.instructions, /Do not call a mid-descent frame a half rep/);
       assert.match(body.instructions, /Do not claim a measured 90-degree knee angle/);
@@ -178,12 +181,23 @@ test('squat depth flags a supported short rep independently of other form checks
     assert.equal(report.formChecks?.length, 5);
     assert.equal(report.formChecks?.find(check => check.criterionId === 'squat_depth')?.status, status);
     assert.equal(report.formChecks?.find(check => check.criterionId === 'grounded_feet')?.status, 'looks_consistent');
+    const review={window:{sessionId:'test',windowId:'depth',startSec:0},report,answer:report.summary};
+    const reassurance=coachingCueText({criterionId:'grounded_feet',kind:'reassurance',status:'consistent',
+      note:'Your heels stay down.',windowId:'depth',observedThroughSec:2},exercise.id,review);
+    if(status==='unclear') {
+      assert.match(reassurance,/squat depth was not confirmed/);
+      assert.match(reviewSpeech(review),/squat depth was not confirmed/);
+    } else if(status==='needs_attention') {
+      assert.ok(reassurance.includes(note),'praise for feet must retain the known depth correction');
+    } else assert.doesNotMatch(reassurance,/not confirmed|depth correction/);
     assert.equal(report.corrections.length, status === 'needs_attention' ? 1 : 0);
     const html = renderToStaticMarkup(createElement(FormChecklist, { report, onSeek: () => {} }));
     assert.match(html, /Squat depth/);
     assert.ok(html.includes(note));
     if (status === 'needs_attention') {
       assert.deepEqual(report.corrections[0].evidence.map(item => item.timestampSec), [0, 1, 2]);
+    }
+    if (status !== 'unclear') {
       draft.formChecks.find(check => check.criterionId === 'squat_depth')!.evidence.pop();
       const invalid = await worker.fetch(post('/api/analyze', request), { OPENAI_API_KEY: 'test' });
       assert.equal(invalid.status, 502);

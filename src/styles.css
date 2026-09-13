@@ -54,12 +54,27 @@ main{max-width:1500px}.workspace{grid-template-columns:minmax(0,1.65fr) minmax(3
 .live-status{display:flex;align-items:center;gap:10px;font-size:12px;margin:16px 0;color:#52684a}.live-status>span:last-child{margin-left:auto}
 .live-dot{width:8px;height:8px;border-radius:50%;background:#789457;flex:none}
 .live-findings{padding-top:24px}.live-finding{padding:16px 20px;border:1px solid #dce2d4;border-left:3px solid #b57847;border-radius:9px;margin:10px 0;background:#fffefa}
-.live-finding.improved{border-left-color:#789457;background:#f0f4e9}.live-finding p{font-size:14px;margin:8px 0 0}.live-finding small{display:block;color:#7b8772;margin-top:8px}
+.live-finding.improved,.live-finding.consistent{border-left-color:#789457;background:#f0f4e9}.live-finding p{font-size:14px;margin:8px 0 0}.live-finding small{display:block;color:#7b8772;margin-top:8px}
 .replay-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0}.replay-controls{display:flex;align-items:center;gap:12px;margin:14px 0;font-size:12px;font-variant-numeric:tabular-nums}.replay-controls input{flex:1;min-width:40px;accent-color:#244c38}
 .review-evidence{padding:18px 0;font-size:14px}.review-evidence .evidence-actions{display:flex;flex-wrap:wrap;gap:8px}
-.session-diagnostics{margin-top:20px;color:#7b8772;font-size:11px}.session-diagnostics p{line-height:1.6}.post-session{border-top:1px solid #dce2d4;padding-top:24px}
+.post-session{border-top:1px solid #dce2d4;padding-top:24px}
 @media(max-width:560px){.mode-selector{gap:8px}.mode-choice{padding:14px 12px}.mode-choice strong{font-size:14px}.mode-choice span{font-size:11px}.live-introduction{padding:18px}.live-status{flex-wrap:wrap}.live-status>span:last-child{margin-left:0}.live-workspace .video-toolbar{flex-wrap:wrap}.live-workspace .video-toolbar .actions{max-width:none}.replay-controls{gap:8px}}
 
 /* Mirror only the live presentation; captured frames retain source coordinates. */
 .live-workspace .source-view video,
-.live-workspace .mapped-view canvas{transform:scaleX(-1)}
+.live-workspace .mapped-view canvas,
+.live-workspace .reference-motion canvas{transform:scaleX(-1)}
+
+/* Realistic movement illustrations with HTML captions at every viewport size. */
+.reference-visuals{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:20px;align-items:center}
+.movement-reference{margin:0;min-width:0;overflow:hidden;border:1px solid #dce2d4;border-radius:10px;background:#f4f3eb}
+.movement-reference-heading{display:flex;justify-content:space-between;gap:12px;padding:14px 16px 4px;font-size:10px;letter-spacing:1.2px;color:#60734d;font-weight:600}
+.movement-reference-heading>span:last-child{font-size:10px;letter-spacing:0;font-weight:400;white-space:nowrap}
+.movement-reference>img{display:block;width:100%;height:auto;aspect-ratio:3/2;object-fit:contain}
+.movement-reference-steps{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #dce2d4;background:#fffefa}
+.movement-reference-steps>span{display:flex;align-items:center;gap:9px;padding:14px;font-size:12px;line-height:1.5}
+.movement-reference-steps>span+span{border-left:1px solid #dce2d4}
+.movement-reference-steps b{display:grid;place-items:center;width:23px;height:23px;flex-shrink:0;border-radius:50%;background:#e8edde;color:#526b3c;font-size:11px}
+.reference-anatomy{justify-content:center;gap:12px;flex-wrap:wrap;max-height:none}
+.reference-anatomy>.reference-image{max-width:360px;min-width:0;width:100%;height:auto;max-height:245px;object-fit:contain}
+@media(max-width:560px){.reference-visuals{grid-template-columns:minmax(0,1fr);gap:16px}.movement-reference-heading{padding:12px 10px 4px;font-size:9px;letter-spacing:.6px}.movement-reference-steps>span{align-items:flex-start;padding:10px 8px;gap:6px;font-size:10px}.movement-reference-steps b{width:18px;height:18px;font-size:10px}.reference-anatomy>.reference-image{max-height:180px}}

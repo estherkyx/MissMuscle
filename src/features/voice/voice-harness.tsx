@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { useEffect, useRef, useState } from 'react';
 import { AnalysisReportSchema, type CoachCommand } from '../../../shared/contracts';
 import { demoReport } from '../../../shared/fixtures/demo-report';
-import { connectCoach, type CoachConnection, type CoachStatus } from './coach-client';
+import { connectCoach, CoachShutdownError, type CoachConnection, type CoachStatus } from './coach-client';
 
 function VoiceHarness() {
   const [report, setReport] = useState(demoReport);
@@ -47,14 +47,14 @@ function VoiceHarness() {
       });
       if (abort.signal.aborted || !mounted.current) await result.disconnect();
       else connection.current = result;
-    } catch (e) { if (mounted.current) setError(e instanceof Error ? e.message : 'Could not connect.'); }
+    } catch (e) { if (mounted.current && !(e instanceof CoachShutdownError)) setError(e instanceof Error ? e.message : 'Could not connect.'); }
     finally { if (mounted.current) setBusy(false); }
   }
   async function stop() {
     setBusy(true);
     try {
       if (connection.current) await connection.current.disconnect(); else controller.current?.abort();
-    } catch (e) { setError(e instanceof Error ? e.message : 'Session finalization failed.'); }
+    } catch (e) { if (!(e instanceof CoachShutdownError)) setError(e instanceof Error ? e.message : 'Voice could not stop.'); }
     finally { connection.current = null; setBusy(false); }
   }
   const active = status === 'connecting' || status === 'listening' || status === 'speaking';

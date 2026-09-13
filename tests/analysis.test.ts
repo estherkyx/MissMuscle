@@ -160,3 +160,22 @@ test('GPT-Live handshake uses the Live API with Responses delegation and preserv
   const session = await createLiveSession({ sdpOffer: 'sdp-offer', context: { report: demoReport, currentTimeSec: 0, selectedCorrectionId: null } }, { OPENAI_API_KEY: 'test' });
   assert.deepEqual(session, { sessionId: 'opaque_live_123', sdpAnswer: 'sdp-answer' });
 });
+
+test('live analysis requests compact checks and expands them into timestamp-grounded corrections', async t => {
+  const compact={summary:'The wrist bent during the recent lift.',visibility:{assessable:true,limitations:[]},
+    formChecks:draft.formChecks.map(c=>c.criterionId==='neutral_wrist'?{...c,status:'needs_attention',note:'Your wrist bent; keep it aligned next rep.',evidence:[{frameIndex:2}]}:c)};
+  t.mock.method(globalThis,'fetch',async(_input:unknown,init:RequestInit)=>{
+    const body=JSON.parse(init.body as string);
+    assert.equal(body.model,'gpt-6-astra');
+    assert.deepEqual(body.reasoning,{effort:'low'});
+    assert.equal(body.max_output_tokens,2400);
+    assert.deepEqual(Object.keys(body.text.format.schema.properties).sort(),['formChecks','summary','visibility']);
+    assert.match(body.instructions,/most recent supported state/);
+    return Response.json(envelope(compact));
+  });
+  const report=await analyzeClip(request,{OPENAI_API_KEY:'test-only'},{});
+  assert.equal(report.corrections.length,1);
+  assert.equal(report.corrections[0].evidence[0].timestampSec,7);
+  assert.equal(report.corrections[0].evidence[0].region,null);
+  assert.equal(report.source,'astra');
+});

@@ -25,15 +25,24 @@ Inference uses the existing pinned MediaPipe dependency and downloaded WASM/mode
 Video inference stays local and uses MediaPipe VIDEO tracking. Multiple people
 clear the map. [The pose filter](pose-filter.ts) accepts finite, in-frame joints
 with visibility at least 0.75, smooths movement, and rejects isolated jumps;
-two consistent detections can reacquire a displaced joint. Missing joints retain
-their last reliable position for 150 ms of clip time, then fade out by 350 ms.
-These retained joints are dashed, excluded from reference movement and target
-colors, and never replaced with authored limbs.
+two consistent detections can reacquire a displaced joint. Joints with visibility
+from 0.5 to below 0.75 can remain visible after two consistent
+detections, as dashed uncertain outlines without target colors. This applies
+equally to either arm and uses that joint’s own detected position. Missing joints
+retain their last accepted position for 150 ms of clip time, then fade out by
+350 ms. Uncertain observations and inferred or retained joints never get target colors.
+Uploaded reference timing may use consistent detections with visibility at least
+0.5; retained positions are excluded from its movement signal. No body-map limb
+is replaced with an authored reference limb.
+Reacquisition after expiry starts at the new detection rather than an old position.
 
 Framing uses the video's fixed contain rectangle, so a wandering joint cannot
 resize the body. Thickness is calibrated from reliable torso joints, not changing
 shoulder width. Preparation samples the clip at 10 Hz with a separate video, then
-releases its detector. Playback interpolates accepted adjacent cached joints.
+releases its detector. Playback uses monotone cubic interpolation between cached joint positions.
+Preparation bridges joint occlusions of up to 0.6 seconds between observations
+of the same joint; inferred positions stay dashed and cannot cross multiple
+people or missing scan samples. Never-observed limbs are not fabricated.
 Pausing freezes the map and fade timers; seeking reads the same cached timeline.
 Resizing only redraws. Stop mapping, replace the clip, or unmount to cancel scanning
 and discard cached data. Model load failures remain explicit.
@@ -164,13 +173,22 @@ three-quarter views without copying observed torso lean or form errors.
 Rotation is prepared with clip-time smoothing and holds the last reliable estimate
 for at most 0.35 seconds. Seeking reads the cached estimate; clip/exercise changes
 or mapping restart discard it.
-Conflicting torso directions or missing landmarks produce an explicit facing
-unavailable state once the hold expires. Multiple people clear the estimate.
+Conflicting torso directions or missing landmarks clear the tracked facing
+once the hold expires. Multiple people clear the estimate.
 Facing remains approximate; no measured angle or reconstructed anatomy is claimed.
+An unavailable estimate changes to the labelled example camera angle, without
+hiding the reference illustration.
 
 The [reference renderer](reference-renderer.ts) projects body and equipment through
 the same rotation with fixed 3:4 framing, drawing farther geometry first.
-The reference waits when tracking is disabled or movement joints are unavailable.
+The reference automatically follows clip playback, pausing and seeking with it.
+There are no separate example playback controls or movement slider. Directional
+segments include clips that start or end mid-movement, labelled approximate.
+Brief gaps up to 0.6 seconds are interpolated from surrounding movement samples.
+The full authored range eases smoothly between detected direction changes.
+Without usable movement evidence, the illustration holds its pose. Missing facing estimates use
+an explicitly labelled authored three-quarter angle while reliable movement
+timing continues to follow the clip.
 The 2D pose helpers and reference-sheet endpoints project the same spatial poses.
 No server or shared interface changes are required.
 
@@ -191,8 +209,10 @@ and 1 for the opposite endpoint, reversing on return.
 Timing uses a three-sample median, six-degree reversal hysteresis, 0.25-second
 minimum movement intervals and 0.2-second holds (0.5-degree plateau tolerance).
 These are illustration timing settings, never analysis thresholds. Side selection
-locks for the scan. Occlusion, multiple people, missing samples and unbounded clip
-edges interrupt reference motion; stationary footage does not create a repetition.
+locks for the scan. Brief occlusion can be inferred from neighboring samples; multiple people,
+missing scan samples and longer occlusions interrupt reference motion. Unbounded
+clip edges can supply approximate lifting/lowering segments. Stationary footage
+holds a reference pose and does not create a repetition.
 Body mapping remains observed movement, not the target pose. Interpolation and
 facing are approximate. The cache is local to one mounted clip/exercise and is
 cleared on replacement, stop or unmount; no footage is persisted or uploaded by it.
@@ -214,3 +234,27 @@ overflow. A real browser detector scan on labelled synthetic stationary footage
 produced no invented repetition; repeated seeks returned identical body-map pixels
 and stopping mapping succeeded. The local harness supplied the known three-second
 duration for its streaming WebM fixture; it did not mock the pose detector.
+
+Mapping availability update: regression tests cover lower-confidence observations
+on both arms, rejected inconsistent detections, recovery after occlusion, and
+automatic directional reference timing, cubic playback interpolation and bounded
+occlusion inference. Missing facing uses the labelled example camera angle. Shared contracts,
+provider modules, voice interfaces and dependencies are unchanged. Real-clip
+visual acceptance remains necessary; Chrome computer access was denied during
+this verification session.
+
+Automatic reference update: `npm run check` covers mid-lift/mid-drop clips,
+full/partial repetitions, inferred gaps, stationary holds, deterministic pause
+and backward seeking, clearer-right-arm selection, smooth joint velocity and
+no interpolation overshoot. These synthetic checks do not establish detector
+accuracy on the user’s actual footage.
+
+
+## Live reference template
+
+Live mode uses a fixed three-quarter reference template on a four-second loop,
+with smooth lifting/lowering and full authored range. It does not consume pose
+phase or camera-facing estimates. Its canvas redraws on animation frames without
+per-frame React state updates; it stops when the live view is inactive. The
+body map still follows camera observations. Uploaded reference synchronization
+is unchanged. The live header labels the reference as a looping example.

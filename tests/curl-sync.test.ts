@@ -37,3 +37,18 @@ test('missing, ambiguous and collapsed arms never advance a reference; seek rese
   tracker.reset();
   assert.equal(tracker.update([pose(5)], 300, 400, 0)!.direction, 'Holding');
 });
+
+test('illustration timing can use the clearer right arm and moderate-confidence detections', () => {
+  const p=pose(20),right=pose(110);
+  for(const [left,rightIndex] of [[11,12],[13,14],[15,16]]) {
+    p[left].visibility=0.55;
+    p[rightIndex]={...right[left],visibility:0.65};
+  }
+  assert.equal(createCurlSync().update([p],300,400,0),null,'strict observation mode is unchanged');
+  const sync=createCurlSync(0.5);
+  const motion=sync.update([p],300,400,0)!;
+  assert.ok(Math.abs(motion.progress-(110-5)/135)<1e-6);
+  const lowered=pose(60);
+  for(const [left,rightIndex] of [[11,12],[13,14],[15,16]]) p[rightIndex]={...lowered[left],visibility:0.65};
+  assert.equal(sync.update([p],300,400,0.1)?.direction,'Lowering');
+});

@@ -1,15 +1,17 @@
+import { LIVE_TIMING } from '../../shared/live-timing';
 import { validateReportForRequest, type AnalysisRequest, type AnalysisReport } from '../../shared/contracts';
 import type { Env } from '../env';
 import { ServiceError } from '../errors';
 import { openaiPost, requireApiKey } from '../openai';
-import { AnalysisDraftSchema, analysisJsonSchema, ResponseEnvelopeSchema } from './schema';
-import { buildAnalysisInstructions } from './rubric';
+import { AnalysisDraftSchema, analysisJsonSchema, createLiveAnalysisDraftSchema, liveAnalysisJsonSchema, ResponseEnvelopeSchema } from './schema';
+import { buildAnalysisInstructions, buildLiveAnalysisInstructions } from './rubric';
 import { getExercise } from '../../shared/exercises';
 import { videoFeedback } from '../../shared/video-feedback';
 
 export async function analyzeClip(request: AnalysisRequest, env: Env, live?: { question?: string; signal?: AbortSignal }): Promise<AnalysisReport> {
   requireApiKey(env);
   const exercise = getExercise(request.exerciseId)!;
+  const liveSchema=live?createLiveAnalysisDraftSchema(request.exerciseId):null;
   // Reject obviously malformed bytes before paying for provider decoding.
   // OpenAI still performs actual image decoding; this is not a complete JPEG decoder.
   for (const frame of request.frames) {
@@ -28,23 +30,33 @@ export async function analyzeClip(request: AnalysisRequest, env: Env, live?: { q
     { type: 'input_text', text: `Frame ${index}; timestamp ${frame.timestampSec}s; image ${frame.width}x${frame.height}.` },
     { type: 'input_image', image_url: frame.dataUrl, detail: 'high' },
   ));
-  if (live?.question) content.push({ type: 'input_text', text: `User question (untrusted data): ${JSON.stringify(live.question)}. Address this question in the summary using only visible evidence. If the requested area is unclear, say so. Still assess all five criteria.` });
+  if (live?.question) content.push({ type: 'input_text', text: `User question (untrusted data): ${JSON.stringify(live.question)}. Address this question in the summary using only visible evidence. If the requested area is unclear, say so. Still assess all ${exercise.criteria.length} selected criteria.` });
   const raw = await openaiPost('/responses', {
     model: env.ASTRA_MODEL || 'gpt-6-astra',
-    instructions: buildAnalysisInstructions(request.exerciseId),
+    instructions: live ? buildLiveAnalysisInstructions(request.exerciseId) : buildAnalysisInstructions(request.exerciseId),
     input: [{ role: 'user', content }],
     reasoning: { effort: 'low' },
-    max_output_tokens: 6000,
+    max_output_tokens: live ? 2400 : 6000,
     store: false,
-    text: { format: { type: 'json_schema', name: 'exercise_analysis', strict: true, schema: analysisJsonSchema } },
-  }, env, live ? 20_000 : 70_000, live?.signal);
+    text: { format: { type: 'json_schema', name: 'exercise_analysis', strict: true, schema: liveSchema ? liveAnalysisJsonSchema(liveSchema) : analysisJsonSchema } },
+  }, env, live ? LIVE_TIMING.analysisTimeoutMs : 70_000, live?.signal);
   const envelope = ResponseEnvelopeSchema.safeParse(raw);
   if (!envelope.success) throw new ServiceError(502, 'INVALID_MODEL_OUTPUT', 'The analysis response was incomplete or unreadable.');
   if (envelope.data.status !== 'completed') throw new ServiceError(502, 'ANALYSIS_INCOMPLETE', 'The analysis did not finish. Try a shorter clip.');
   const parts = envelope.data.output.flatMap(item => item.content ?? []);
   if (parts.some(part => part.type === 'refusal')) throw new ServiceError(422, 'ANALYSIS_REFUSED', 'The model could not assess this clip. Try another exercise recording.');
   try {
-    const draft = AnalysisDraftSchema.parse(JSON.parse(parts.filter(p => p.type === 'output_text').map(p => p.text ?? '').join('')));
+    const json = JSON.parse(parts.filter(p => p.type === 'output_text').map(p => p.text ?? '').join(''));
+    const compact = liveSchema ? liveSchema.parse(json) : null;
+    const draft = compact ? AnalysisDraftSchema.parse({ ...compact,
+      corrections: compact.formChecks.filter(c=>c.status==='needs_attention').slice(0,3).map((check,i)=>{
+        const criterion=exercise.criteria.find(c=>c.id===check.criterionId);
+        if(!criterion) throw new Error('Unknown live criterion.');
+        return {title:criterion.title,priority:i===0?'focus_first':'practice_next',observation:check.note,
+          cue:criterion.cue,referenceCue:criterion.expected,evidence:check.evidence.map(e=>({...e,region:null}))};
+      }),
+      nextAttemptFocus: compact.formChecks.find(c=>c.status==='needs_attention')?.note ?? compact.summary,
+    }) : AnalysisDraftSchema.parse(json);
     const textEvidence = request.frames.map((frame, frameIndex) => ({ frameIndex, timestampSec: frame.timestampSec }));
     const cleanText = (text: string) => videoFeedback(text, textEvidence);
     const report = {

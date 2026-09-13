@@ -1,18 +1,56 @@
 # MissMuscle
 
-Exercise form review and live spoken coaching for the **Visual Understanding** and
-**GPT-Live-1** tracks. The app uses `gpt-6-astra` for sampled-frame analysis and
-`gpt-live-1` for spoken guidance. Provider failures are shown explicitly; the public
-interface never substitutes fixture findings or fake audio.
+**See what to change in your next rep—and the moment that explains why.**
+
+MissMuscle turns a short exercise video into specific form feedback with clickable
+visual evidence. During live exercise, it also speaks feedback so you can keep
+your attention on the movement, then lets you replay the moments behind a correction.
+
+Primary track: **Best example of Visual Understanding**. Second track:
+**Best use of GPT-Live-1**.
+
+## Why Visual Understanding
+
+The core interaction is **movement → observation → cited moment → next-rep cue**.
+
+- **Reasoning across time:** `gpt-6-astra` receives ordered, timestamped images and
+  exercise-specific criteria. For squat depth and leg-extension range, the rubric
+  requires evidence of approach, turnaround, and return before judging the endpoint.
+  A single mid-rep position cannot establish incomplete range.
+- **Inspectable findings:** the model cites submitted frame indices; the server
+  derives timestamps from those frames and rejects invalid references. Clicking
+  evidence seeks the video to that moment. Live replay also retains the exact
+  assessed images. These checks establish traceability, not that every judgment
+  is correct.
+- **Explicit uncertainty:** each criterion can be `looks_consistent`,
+  `needs_attention`, or `unclear`. A hidden body region need not prevent review of
+  other visible criteria. An unclear result never becomes positive reassurance.
+- **Feedback you can act on:** at most three prioritized corrections connect the
+  visible observation to a practical cue and an educational exercise reference.
+
+| Component | Responsibility |
+| --- | --- |
+| `gpt-6-astra` | Interpret submitted exercise images and return findings with evidence references. |
+| Local MediaPipe tracker | Approximate body mapping, movement timing, and selection of live rep evidence. |
+| Application code | Validate evidence, derive timestamps, seek/replay, and select timely coaching cues. |
+| `gpt-live-1` | Deliver spoken guidance from the selected analysis feedback during live exercise. |
+| Reference artwork and muscle colors | Explain the selected exercise and target anatomy; these are educational guides, not model measurements. |
+
+**Try the evidence loop:** upload a short clip, analyse it, select a correction,
+and click its evidence timestamps. In live mode, end the session and open
+**View the exact moments assessed** for a retained correction.
+
+Provider failures are shown explicitly; the public interface never substitutes
+fixture findings or fake audio.
 
 ## Modes
 
 | Exercise | Uploaded video review | Live exercise |
 | --- | --- | --- |
 | Dumbbell curl | Supported | Supported; laptop Chrome target |
-| Seated overhand front lat pulldown | Supported | Not enabled |
-| Seated machine leg extension | Supported | Not enabled |
-| Two-dumbbell front squat | Supported | Not enabled |
+| Seated overhand front lat pulldown | Supported | Supported; laptop Chrome target |
+| Seated machine leg extension | Supported | Supported; laptop Chrome target |
+| Two-dumbbell front squat | Supported | Supported; laptop Chrome target |
 
 **Upload a video:** choose an exercise and a clip of up to 15 seconds / 40 MiB.
 Analyse it to get exercise-specific corrections and clickable evidence timestamps.
@@ -21,24 +59,21 @@ an approximate body map and a reference demonstrating full target range at the
 clip's repetition timing. Reference sheets include exercise and camera guidance.
 This mode does not start voice or request microphone access.
 
-**Live exercise:** start the camera for a mirrored preview, local body tracking,
-an updating correction list, and automatic spoken guidance. The coach speaks
-corrections; users do not need to speak back, and no microphone is captured.
-Mute coach silences output. Tracking targets 12–15 updates per second. Starting
-after five seconds, the app submits up to 12 ordered frames from the latest
-available ten-second window every five seconds when analysis is idle. It allows
-one visual request at a time with a 20-second timeout. Repeated findings update
-existing cards; automatic cues have a ten-second minimum interval and a
-30-second cooldown per criterion. Findings over 15 seconds behind capture are
-not spoken as current corrections. Camera and mapping can continue if AI or
-voice fails.
+**Live exercise:** start the camera for local body tracking, an updating correction
+list, and automatic spoken guidance about reviewed reps. GPT-Live-1 speaks the
+selected feedback without requiring the user to speak or granting microphone
+access. Visual requests inspect sampled moments; feedback can arrive after the
+movement. Camera and mapping can continue if analysis or voice fails.
 
-**After live exercise:** End session stops capture and voice and opens silent
-review of the latest ten seconds and up to five distinct correction clips.
-Evidence seeks within its associated recording. Independently recorded segments
-form a logical replay timeline, using a format the browser can both record and
-play. Recordings contain video only and remain in memory until reset, a new live
-session, or leaving the page. There is no cloud recording storage.
+**After live exercise:** End session opens silent replay of up to ten seconds
+ending at the last detected rep, plus up to five distinct correction clips. Select
+a correction and expand **View the exact moments assessed** to inspect the images
+behind it. When rep tracking is unavailable, replay labels the recent-recording
+fallback. Recordings contain video only and remain in browser memory until reset,
+a new live session, or leaving the page; there is no cloud recording storage.
+
+See [live coaching and replay mechanics](docs/LIVE_WORKFLOW.md) for sampling,
+evidence timing, cue freshness, audio recovery, and recording behavior.
 
 Muscle colors are **educational target-muscle guidance**, not measured activation,
 a safety score, or a diagnosis. Tracking and reference timing are approximate;
@@ -87,7 +122,7 @@ Shared schemas and types live in `shared/contracts.ts`; coordinate changes throu
 - `src/features/voice/`: typed coach adapter; live guidance uses `guidanceOnly: true`
   and silent transport audio rather than microphone capture.
 - `shared/exercises.ts` and `shared/exercise-criteria.ts`: four-exercise catalogue
-  and assessment criteria. Live contracts remain curl-only.
+  and assessment criteria. Live contracts support all four exercises and bind findings to the selected exercise.
 - `server/`: portable Web Request/Response handlers and real provider integration.
 - `scripts/dev-api.ts`: Node-only local API bridge.
 - `dist/client/` and `dist/worker/index.js`: generated browser assets and server bundle.
@@ -103,6 +138,11 @@ conversational interface and a visibly fictional report unless a real report is
 imported. It is not the public uploaded-review workflow.
 
 ## Validation and remaining work
+
+Local verification on 13 September 2026: `npm run check` passed **185 tests**,
+TypeScript checks, and browser/server production builds. This verifies software
+behavior; real exercise accuracy and current end-to-end audio still need demo
+evidence. No hosted demo or recording is linked here yet.
 
 Automated checks cover contracts, evidence validation, analysis boundaries,
 reference scanning, correction suppression, recording/replay lifecycle, and voice

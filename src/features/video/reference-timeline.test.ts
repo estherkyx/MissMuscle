@@ -33,22 +33,28 @@ test('tempo changes retain full range, endpoint holds, and do not advance on wal
     assert.deepEqual(referenceAt(timeline,0.9*repeat),referenceAt(timeline,0.9*repeat));
   }
 });
-test('stationary footage, jitter and unbounded clip edges never invent repetitions',()=>{
-  for(const values of [Array(30).fill(50),Array.from({length:30},(_,i)=>50+Math.sin(i)*2),Array.from({length:10},(_,i)=>i*5)]) {
+test('stationary footage and jitter hold a reference without inventing repetitions',()=>{
+  for(const values of [Array(30).fill(50),Array.from({length:30},(_,i)=>50+Math.sin(i)*2)]) {
     const timeline=buildReferenceTimeline('lat_pulldown',values.map(sample));
     assert.equal(timeline.spans.length,0);
-    assert.equal(referenceAt(timeline,0.5).motion,null);
+    assert.equal(referenceAt(timeline,0.5).motion?.direction,'Holding');
   }
 });
-test('occlusion, ambiguous people and missing samples break reference continuity',()=>{
+test('brief occlusion is inferred while ambiguous people and missing samples break reference continuity',()=>{
   for(const kind of ['hidden','multiple','gap']) {
     let samples=rep.map((v,i)=>sample(v*30,i));
     if(kind==='hidden')samples[6].value=null;
     if(kind==='multiple')samples[6].multiple=true;
     if(kind==='gap')samples=samples.filter((_,i)=>i!==6);
     const timeline=buildReferenceTimeline('dumbbell_curl',samples);
-    assert.equal(referenceAt(timeline,0.6).motion,null,kind);
-    assert.ok(!timeline.spans.some(s=>s.start<0.6&&s.end>0.6),kind);
+    if(kind==='hidden') {
+      assert.equal(referenceAt(timeline,0.6).motion?.direction,'Lifting');
+      assert.equal(referenceAt(timeline,0.6).motion?.inferred,true);
+    } else {
+      assert.ok(!timeline.spans.some(s=>s.start<0.6&&s.end>0.6),kind);
+      if(kind==='multiple') assert.equal(referenceAt(timeline,0.6).motion,null);
+      else assert.equal(referenceAt(timeline,0.6).motion?.direction,'Holding');
+    }
   }
 });
 const length=(a:SpatialJoint,b:SpatialJoint)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
@@ -93,4 +99,45 @@ test('scan samples are ordered, capped at clip duration and include short clips'
     assert.ok(times.every((v,i)=>i===0||v>times[i-1]));
   }
   assert.throws(()=>scanTimes(16));
+});
+
+test('interpolation keeps uncertain and retained positions visibly marked', () => {
+  const a=sample(null,0),b=sample(null,1);
+  a.body.joints=[{x:0.2,y:0.5,visibility:1,observed:true,opacity:1}];
+  b.body.joints=[{x:0.4,y:0.5,visibility:0.6,observed:true,uncertain:true,opacity:0.8}];
+  const timeline=buildReferenceTimeline('dumbbell_curl',[a,b]);
+  const middle=referenceAt(timeline,0.05);
+  assert.ok(Math.abs(middle.body.joints[0].x-0.3)<1e-7);
+  assert.equal(middle.body.joints[0].uncertain,true);
+  assert.equal(middle.body.joints[0].visibility,0);
+  assert.equal(middle.motion,null);
+  assert.deepEqual(referenceAt(timeline,0).body.joints,a.body.joints);
+  b.body.joints[0].observed=false;b.body.joints[0].visibility=0;
+  assert.equal(referenceAt(buildReferenceTimeline('dumbbell_curl',[a,b]),0.05).body.joints[0].uncertain,true);
+});
+
+test('clips starting mid-lift or mid-drop automatically get smooth directional references',()=>{
+  for(const direction of [1,-1]) {
+    const values=Array.from({length:11},(_,i)=>sample(60+direction*i*3,i));
+    const timeline=buildReferenceTimeline('dumbbell_curl',values);
+    const early=referenceAt(timeline,0.2).motion!,late=referenceAt(timeline,0.7).motion!;
+    assert.equal(early.direction,direction>0?'Lifting':'Lowering');
+    assert.equal(early.inferred,true);
+    assert.ok((late.progress-early.progress)*direction>0);
+    for(let time=0.01;time<0.95;time+=0.01) {
+      const a=referenceAt(timeline,time).motion!,b=referenceAt(timeline,time+0.001).motion!;
+      assert.ok(Math.abs(b.progress-a.progress)<0.004,'no jumps between scan frames');
+    }
+    assert.deepEqual(referenceAt(timeline,0.4),referenceAt(timeline,0.4),'pause is deterministic');
+    referenceAt(timeline,0.8);
+    assert.deepEqual(referenceAt(timeline,0.2).motion,early,'backward seek reproduces phase');
+  }
+});
+
+test('a long loss of movement tracking holds instead of inventing lifts or drops',()=>{
+  const samples=Array.from({length:25},(_,i)=>sample(i<7?i*5:i<17?null:(24-i)*5,i));
+  const timeline=buildReferenceTimeline('dumbbell_curl',samples);
+  assert.equal(referenceAt(timeline,1.1).motion?.direction,'Holding');
+  assert.equal(referenceAt(timeline,1.1).motion?.progress,referenceAt(timeline,1.5).motion?.progress);
+  assert.ok(!timeline.spans.some(s=>s.start<1&&s.end>1.6));
 });

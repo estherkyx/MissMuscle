@@ -191,8 +191,8 @@ export default function App() {
       <button className={mode === 'upload' ? 'mode-choice selected' : 'mode-choice'} aria-pressed={mode === 'upload'} disabled={working} onClick={() => setMode('upload')}><strong>Upload a video</strong><span>Review your form with timestamped evidence</span></button>
       <button className={mode === 'live' ? 'mode-choice selected' : 'mode-choice'} aria-pressed={mode === 'live'} disabled={working} onClick={() => { videoRef.current?.pause(); setMappingEnabled(false); setMode('live'); }}><strong>Live exercise</strong><span>Move with a body map and a spoken coach</span></button>
     </div>
-    {exercise === 'dumbbell_curl' && <LiveExercise visible={mode === 'live'} />}
-    {mode === 'live' && exercise !== 'dumbbell_curl' && <section className="video-workspace"><h2>{referenceOnly ? 'Live coaching is available for dumbbell curls.' : 'Choose dumbbell curl to start live coaching.'}</h2><p className="muted">Choose Upload a video to analyse the other supported exercises.</p></section>}
+    {selectedExercise && <LiveExercise key={selectedExercise.id} exerciseId={selectedExercise.id} visible={mode === 'live'} />}
+    {mode === 'live' && !selectedExercise && <section className="video-workspace"><h2>Choose an exercise to start live coaching.</h2></section>}
     <div hidden={mode !== 'upload'}>
     <section className="video-workspace" id="movement-video" aria-labelledby="video-title">
       <div className="video-toolbar"><div><span className="eyebrow">Your movement</span><h2 id="video-title">{referenceOnly ? reference.label : clip ? 'Let’s look at your form.' : 'Start with a short clip.'}</h2></div>

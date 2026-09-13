@@ -97,3 +97,68 @@ test('a wandering foot cannot change torso framing in portrait or landscape', ()
     assert.notDeepEqual(render(p, 800), after, 'resize recomputes the video contain rectangle');
   }
 });
+
+test('either lower-confidence arm remains visible as an uncertain observation without copying the other arm', () => {
+  for (const side of [[11,13,15], [12,14,16]]) {
+    const filter = createPoseFilter(), p = pose();
+    for (const i of side) p[i].visibility = 0.6;
+    const first = filter.update([p], 720, 1280, 0);
+    assert.equal(first.joints[side[2]].opacity, 0, 'require a second consistent detection');
+    p[side[2]].x += 0.02;
+    const second = filter.update([p], 720, 1280, 0.1);
+    for (const i of side) {
+      assert.ok(second.joints[i].opacity! > 0);
+      assert.equal(second.joints[i].uncertain, true);
+      assert.equal(second.joints[i].observed, true);
+      assert.equal(reliableJoint(second.joints[i]), false);
+      assert.equal(second.joints[i].x, p[i].x);
+    }
+    assert.equal(createExerciseSync('dumbbell_curl').update([second.joints.map((joint,i) =>
+      side.includes(i) ? joint : {...joint,visibility:0})],720,1280,0.1), null);
+    const held = filter.update([], 720, 1280, 0.2);
+    assert.equal(held.joints[side[2]].observed, false);
+    assert.equal(filter.update([], 720, 1280, 0.46).joints[side[2]].opacity, 0);
+  }
+});
+
+test('reacquiring either arm after its hold expires uses its new location immediately', () => {
+  for (const wrist of [15,16]) {
+    const filter = createPoseFilter(), p = pose();
+    filter.update([p],720,1280,0);
+    filter.update([],720,1280,0.2);
+    p[wrist].x = 0.9;
+    const recovered = filter.update([p],720,1280,0.4).joints[wrist];
+    assert.equal(recovered.x,0.9);
+    assert.ok(reliableJoint(recovered));
+  }
+});
+
+test('inconsistent lower-confidence detections never create a visible limb', () => {
+  const filter = createPoseFilter(), p = pose();
+  p[16] = {x:0.1,y:0.4,visibility:0.6};
+  filter.update([p],720,1280,0);
+  p[16].x = 0.9;
+  assert.equal(filter.update([p],720,1280,0.1).joints[16].opacity,0);
+});
+
+test('the renderer draws each uncertain arm at its own detected coordinates as a dashed guide', () => {
+  for (const [shoulder,elbow,wrist] of [[11,13,15],[12,14,16]]) {
+    const filter = createPoseFilter(), p = pose();
+    for (const i of [shoulder,elbow,wrist]) p[i].visibility = 0.6;
+    filter.update([p],300,400,0);
+    const body = filter.update([p],300,400,0.1);
+    const strokes: {color:unknown; points:number[][]; dash:number[]}[] = [];
+    let points: number[][] = [], dash: number[] = [];
+    const properties: Record<PropertyKey,unknown> = {};
+    const ctx = new Proxy(properties, {get: (target,key) => {
+      if (key === 'beginPath') return () => {points=[];};
+      if (key === 'moveTo' || key === 'lineTo') return (...args:number[]) => points.push(args);
+      if (key === 'setLineDash') return (value:number[]) => {dash=value;};
+      if (key === 'stroke') return () => strokes.push({color:target.strokeStyle,points:[...points],dash:[...dash]});
+      return target[key] ?? (() => {});
+    }}) as unknown as CanvasRenderingContext2D;
+    drawMappedBody(ctx,300,400,300,400,[body.joints],'dumbbell_curl',body);
+    const expected = [shoulder,elbow].map(i => [p[i].x*300,p[i].y*400]);
+    assert.ok(strokes.some(s => s.color === '#a9b7bc' && s.dash.length > 0 && JSON.stringify(s.points) === JSON.stringify(expected)));
+  }
+});

@@ -2,7 +2,8 @@
 
 All four dropdown variations support local upload, Astra review, submitted-frame
 evidence seeking, body mapping and synchronized illustrations. Live camera coaching
-is curl-only and provides automatic spoken corrections without microphone capture.
+supports all four exercises with automatic spoken corrections, specific reassurance
+and next-rep reminders without microphone capture.
 Uploaded review has no voice session. Fictional curl fixtures remain in tests and
 the separate conversational voice development harness.
 
@@ -58,7 +59,7 @@ This update does not change curl analysis.
 
 - [contracts](../shared/contracts.ts) exports `ExerciseId` from the four-value Zod
   enum. Uploaded requests and reports share it; live contexts and analysis windows
-  are restricted to dumbbell curls. Schema version stays `1`;
+  support the same four exercises and reject mismatched session findings. Schema version stays `1`;
   deploy UI and server together because older servers accept only curl requests.
 - [exercise catalogue](../shared/exercises.ts) owns labels, variants, camera tips,
   target muscles and sources. It attaches versioned [criteria](../shared/exercise-criteria.ts)
@@ -111,8 +112,10 @@ body-map landmarks are sent to the voice model. All views share the video timeli
   the authored pose bends hips and knees with fixed feet and front-rack weights.
 
 Angles map only to illustration progress, never grading thresholds. Side selection
-locks until reset. Hidden/collapsed joints, ambiguous people and seeking suppress
-reference motion; no timer advances an invented repetition. Colors indicate
+locks until reset for tracked/uploaded movement. Live reference demonstrations
+use independent, smooth loops with fixed exercise-appropriate views; body maps
+continue following the camera. Hidden/collapsed joints and ambiguous people do
+not create observed repetitions. Colors indicate
 educational target areas, not anatomical segmentation. Lat and glute patches are
 approximate torso-side/hip areas and cannot establish front/back surface visibility.
 
@@ -134,3 +137,70 @@ exercises after a report and confirm the clip, findings and microphone clear.
 Verify provider failures show errors without sample findings. Do not claim
 accuracy from mocked provider responses or authored pose tests. Keep footage
 under ignored `demo-private/`; no deployment is included in this change.
+
+
+## Live expansion integration
+
+All four exercise selections mount `LiveExercise` keyed by the selected ID;
+switching exercises stops the old camera/voice session and clears review state.
+Person A passes the ID through camera windows, body maps, looping references,
+coaching cues and rep-based retention. Pulldown and leg-extension detectors anchor
+at the seated hip, while squat retention anchors at the planted ankle so normal
+squat descent is not mistaken for walking toward the controls. These are replay
+selection heuristics, not form or rep-count measurements.
+
+Person B's compact live schema uses exactly the selected criterion IDs and count.
+Squat depth and leg-extension range checks can cite three submitted moments;
+existing endpoint requirements still apply. The live rubric and voice session
+name the selected variation. The successful four-frame request path, deadlines,
+audio acknowledgment handling and stale-result recovery remain in place.
+`shared/contracts.ts` permits all four live exercise IDs and rejects a context
+whose latest result belongs to a different exercise. Browser voice contexts also
+reject changing exercise mid-session. Release browser and server changes together.
+
+The expansion passes 170 automated tests and both production builds. Real API
+probes completed for all three added live exercises using repeated test artwork;
+actual live exercise/speaker acceptance remains separate from those checks.
+
+
+## Demonstration equipment
+
+Recognizable demonstrations may use office/ordinary chairs, a hand-held bar for
+pulldowns, bottles in place of dumbbells, or no external resistance. The selected
+exercise remains the comparison; its visible movement can still receive
+corrections. Analysis and voice keep the substitution implicit and focus on form.
+Equipment-specific checks lacking actual landmarks stay unassessed, with neutral
+wording, rather than becoming invented passes or blocking movement assessment.
+The shared instructions live in `shared/movement-review-context.ts`.
+
+
+## Squat turnaround review update
+
+`dumbbell_front_squat-4` requires descent, actual deepest position and ascent for
+positive depth feedback as well as a shallow-rep correction. Standing at the end
+is not adequate-depth evidence. Live capture selects at most four real frames
+around a tracked reversal from an eight-second buffer; a small/shallow excursion
+can trigger review. Pose timing only selects footage; the provider still judges
+the visible movement. Missing or obscured bottom evidence remains unclear. The
+reference uses approximately parallel thighs, not an exact measured knee angle.
+
+
+Leg-extension endpoint update: `leg_extension-4` requires three distinct supplied
+moments for both positive and negative `full_extension` findings: lift, furthest
+extension and return. Live capture now retains these actual frames using the same
+eight-second buffer and four-image request limit as squats. Small partial lifts
+can nominate a review; pose progress never directly grades extension. The prompt
+requires a short-range correction when the visible turnaround is still clearly
+bent, independently of smooth movement. Missing endpoints remain unclear.
+Release the shared contract, browser and server together; older positive
+leg-extension checks with only two moments need reanalysis. Mocked checks verify
+capture and report wiring, not recognition accuracy on real movement.
+
+
+Frontal-squat timing now includes visible hip lowering relative to the ankle,
+so a knee that stays straight in the camera projection does not hide the rep.
+This timing heuristic preserves real camera evidence for provider review; it
+never decides whether depth is correct. The reviewer considers a clearly visible
+high-hip turnaround from the front, while retaining uncertainty when perspective
+or occlusion prevents comparison. Praise for other aspects explicitly qualifies
+unconfirmed or deficient depth in the same review.

@@ -91,7 +91,7 @@ const targets: Record<ExerciseId, string[]> = {
 export const EXERCISES: ExerciseReference[] = catalogue.map(item => {
   const id = ExerciseIdSchema.parse(item.id);
   return { ...item, id, muscles: item.muscles,
-    version: id === 'dumbbell_curl' ? curlReference.version : id === 'lat_pulldown' ? 'lat_pulldown-2' : id === 'leg_extension' ? 'leg_extension-3' : id + '-3',
+    version: id === 'dumbbell_curl' ? curlReference.version : id === 'lat_pulldown' ? 'lat_pulldown-2' : id === 'leg_extension' ? 'leg_extension-4' : id + '-4',
     criteria: exerciseCriteria[id], targetMuscles: targets[id],
     notes: techniqueNotes[id],
   };

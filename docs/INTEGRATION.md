@@ -1,5 +1,10 @@
 # Integration, deployment, and demo
 
+> Historical build plan: the public app now supports uploaded review and automatic
+> live spoken coaching. Use the [current README](../README.md) for current product
+> behavior. The conversational
+> uploaded-video demo and future-work description below are superseded.
+
 ## Five-hour plan
 
 Times are from the team's build start. Scaffold setup is done; adjust remaining

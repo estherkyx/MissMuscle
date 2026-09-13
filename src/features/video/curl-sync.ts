@@ -3,7 +3,7 @@ export type CurlMotion = { progress: number; time: number; direction: 'Lifting' 
 
 // Projected elbow bend estimates phase, not clinical joint angles. Lock to one
 // visible arm so alternating arms cannot flip the reference timing.
-export function createCurlSync() {
+export function createCurlSync(minVisibility = 0.75) {
   let arm: number[] | undefined;
   let previous: { bend: number; time: number } | undefined;
   return {
@@ -12,9 +12,10 @@ export function createCurlSync() {
       const pose = poses.length === 1 ? poses[0] : [];
       const visible = (indices: number[]) => indices.every(i => {
         const p = pose[i];
-        return p && (p.visibility ?? 0) >= 0.75 && Number.isFinite(p.x) && Number.isFinite(p.y) && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1;
+        return p && (p.visibility ?? 0) >= minVisibility && Number.isFinite(p.x) && Number.isFinite(p.y) && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1;
       });
-      if (!arm) arm = [[11, 13, 15], [12, 14, 16]].find(visible);
+      if (!arm) arm = [[11, 13, 15], [12, 14, 16]].filter(visible).sort((a,b) =>
+        Math.min(...b.map(i=>pose[i].visibility??0))-Math.min(...a.map(i=>pose[i].visibility??0)))[0];
       if (!arm || !visible(arm) || width <= 0 || height <= 0) { previous = undefined; return null; }
       const [s, e, w] = arm.map(i => pose[i]);
       const ax = (s.x-e.x)*width, ay = (s.y-e.y)*height;

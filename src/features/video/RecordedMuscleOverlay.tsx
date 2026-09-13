@@ -48,7 +48,7 @@ export function RecordedMuscleOverlay({ videoRef, exerciseId, enabled }: { video
       if(disposed) return;
       controller.abort();hide();setPreparing(false);setFailed(true);
       setStatus('Body tracking is unavailable. Stop and start mapping to retry.');
-      setReferenceStatus('Reference preparation failed. Stop and start mapping to retry.');
+      setReferenceStatus('Clip synchronization failed. Stop and start mapping to retry.');
     };
     function tick() {
       if(disposed) return;
@@ -59,8 +59,8 @@ export function RecordedMuscleOverlay({ videoRef, exerciseId, enabled }: { video
           const hasPose=current.joints.some(p=>(p.opacity??0)>0);
           setMapped(hasPose);setTime(lastTime);setMotion(frame.motion);setReferenceView(frame.view);
           setReferenceStatus(frame.multiple?'Multiple people visible. Use a clip with one person.':
-            !timeline.spans.length?'No reliably bounded movement found. Use a clip showing a clear repetition.':
-            'Reference unavailable at this moment: movement endpoints or joints are uncertain.');
+            !timeline.spans.length?'Repetition timing could not be determined from this clip.':
+            'Movement timing is uncertain at this point in your clip.');
           setStatus(frame.multiple?'Multiple people visible. Use a clip with one person.':
             hasPose?'':motionGuidance[exerciseId]);
         }
@@ -97,7 +97,7 @@ export function RecordedMuscleOverlay({ videoRef, exerciseId, enabled }: { video
 
   return <>
     <ReferenceMotion exerciseId={exerciseId} status={enabled ? referenceStatus : 'Start body mapping to prepare the reference.'}
-      view={enabled && mapped && !failed ? referenceView : null} motion={enabled && mapped && !failed ? motion : null} />
+      view={enabled && !failed ? referenceView : null} motion={enabled && !failed ? motion : null} />
     <div className="mapped-view">
       <div className="viewer-heading"><span>02 / Body map</span><span>{enabled && mapped ? `${time.toFixed(2)}s / SYNCED` : '2D POSE'}</span></div>
       <div className="mapped-stage">

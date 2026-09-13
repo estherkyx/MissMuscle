@@ -9,7 +9,7 @@ test('automatic voice preserves GPT-Live and disables conversational tools', asy
     assert.equal(body.session.delegation.responses.model, 'gpt-6-astra');
     assert.deepEqual(body.session.delegation.responses.tools, []);
     assert.match(body.session.instructions, /no microphone input and no conversation/);
-    assert.match(body.session.instructions, /Speak only when the application provides a verified correction/);
+    assert.match(body.session.instructions, /Speak each application-provided coaching update immediately/);
     return Response.json({ session: { id: 'provider-session' }, transport: { type: 'webrtc', sdp: 'test-sdp-answer' } });
   });
   await createLiveSession({ sdpOffer: 'test-sdp-offer', context: { mode: 'live', guidanceOnly: true, sessionId: 'exercise-session', exerciseId: 'dumbbell_curl', elapsedSec: 0, latest: null } }, { OPENAI_API_KEY: 'test-only-key' });

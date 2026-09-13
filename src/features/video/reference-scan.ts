@@ -19,7 +19,7 @@ export function scanTimes(duration: number) {
 export async function scanReferenceClip(source: string, exerciseId: ExerciseId, detector: ReferenceDetector, signal: AbortSignal, progress: (value:number)=>void) {
   const video=document.createElement('video');
   video.muted=true;video.playsInline=true;video.preload='auto';
-  const filter=createPoseFilter(),facing=createFacingTracker(),sync=createExerciseSync(exerciseId);
+  const filter=createPoseFilter(),facing=createFacingTracker(),sync=createExerciseSync(exerciseId,0.5);
   const samples: ReferenceSample[]=[];
   try {
     await waitForMedia(video,'loadeddata',signal,()=>{video.src=source;video.load();});
@@ -35,7 +35,7 @@ export async function scanReferenceClip(source: string, exerciseId: ExerciseId, 
         const body=filter.update(result.landmarks,video.videoWidth,video.videoHeight,time);
         const motion=sync.update(multiple?result.landmarks:result.landmarks.length?[body.joints]:[],video.videoWidth,video.videoHeight,time);
         const radians=exerciseId==='dumbbell_curl'?135*Math.PI/180:exerciseId==='lat_pulldown'?Math.PI:Math.PI/2;
-        samples.push({time,body,multiple,value:motion?motion.progress*radians:null,
+        samples.push({time,body,multiple,inferred:body.joints.some(p=>p.uncertain),value:motion?motion.progress*radians:null,
           view:facing.update(result.landmarks,result.worldLandmarks,time)});
       } finally { result.close(); }
       progress((i+1)/times.length);

@@ -1,5 +1,6 @@
 import type { LiveSessionRequest, LiveSessionResponse } from '../../shared/contracts';
 import { z } from 'zod';
+import { getExercise } from '../../shared/exercises';
 import { buildCoachInstructions, COACH_TOOLS, LIVE_INSTRUCTIONS, LIVE_EXERCISE_INSTRUCTIONS, LIVE_EXERCISE_TOOLS, AUTOMATIC_COACH_INSTRUCTIONS } from '../../shared/coach-config';
 import type { Env } from '../env';
 import { ServiceError } from '../errors';
@@ -14,7 +15,7 @@ export async function createLiveSession(request: LiveSessionRequest, env: Env): 
   const raw = await openaiPost('/live/sessions', {
     session: {
       model: env.LIVE_MODEL || 'gpt-live-1',
-      instructions: 'mode' in request.context ? request.context.guidanceOnly ? AUTOMATIC_COACH_INSTRUCTIONS : LIVE_EXERCISE_INSTRUCTIONS : LIVE_INSTRUCTIONS,
+      instructions: 'mode' in request.context ? request.context.guidanceOnly ? `${AUTOMATIC_COACH_INSTRUCTIONS}\nSelected exercise: ${getExercise(request.context.exerciseId)!.label}; ${getExercise(request.context.exerciseId)!.variation}.` : `${LIVE_EXERCISE_INSTRUCTIONS}\nSelected exercise: ${getExercise(request.context.exerciseId)!.label}.` : LIVE_INSTRUCTIONS,
       delegation: {
         type: 'responses',
         responses: {

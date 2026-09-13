@@ -1,36 +1,37 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
+import type { ExerciseId } from '../../../shared/contracts';
+import { motionGuidance } from './exercise-motion';
 import { drawMappedBody } from './mapped-body';
 import { ReferenceMotion } from './ReferenceMotion';
-import { createCurlSync, type CurlMotion } from './curl-sync';
-import { createFacingTracker, type ReferenceView } from './reference-view';
 import { createPoseFilter } from './pose-filter';
 import type { Landmark } from './muscle-regions';
 
-export function LiveMuscleOverlay({ videoRef, enabled, live = false, onTrackingRate }: {
-  videoRef: RefObject<HTMLVideoElement | null>; enabled: boolean; live?: boolean; onTrackingRate?: (fps: number) => void;
+export function LiveMuscleOverlay({ videoRef, exerciseId, enabled, live = false, onTrackingRate, onPose }: {
+  videoRef: RefObject<HTMLVideoElement | null>; exerciseId: ExerciseId; enabled: boolean; live?: boolean; onTrackingRate?: (fps: number) => void;
+  onPose?: (poses: Landmark[][], width: number, height: number, capturedAtMs: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [status, setStatus] = useState('');
   const [failed, setFailed] = useState(false);
   const [mapped, setMapped] = useState(false);
   const [time, setTime] = useState(0);
-  const [motion, setMotion] = useState<CurlMotion | null>(null);
-  const [view, setView] = useState<ReferenceView | null>(null);
   const [retry, setRetry] = useState(0);
   const rateRef = useRef(onTrackingRate); rateRef.current = onTrackingRate;
+  const poseRef = useRef(onPose); poseRef.current = onPose;
 
   useEffect(() => {
-    setMapped(false); setMotion(null);
+    setMapped(false);
     if (!enabled) return;
     const video = videoRef.current, canvas = canvasRef.current;
     if (!video || !canvas) return;
     let disposed = false, ready = false, busy = false, animation = 0, generation = 0;
     let lastTime = -1, lastRun = 0, count = 0, rateStart = performance.now();
-    const sync = createCurlSync(), facing = createFacingTracker(), filter = createPoseFilter();
+    let capturedAtMs = 0;
+    const filter = createPoseFilter();
     const worker = new Worker(new URL('./pose.worker.ts', import.meta.url), { type: 'module' });
     const clear = () => canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
-    const invalidate = () => { generation++; clear(); setMapped(false); setMotion(null); sync.reset(); facing.reset(); filter.reset(); setView(null); lastTime = -1; };
-    const fail = (message: string) => { ready = false; clear(); setMapped(false); setMotion(null); setFailed(true); setStatus(message); worker.terminate(); };
+    const invalidate = () => { generation++; clear(); setMapped(false); filter.reset(); lastTime = -1; };
+    const fail = (message: string) => { ready = false; clear(); setMapped(false); setFailed(true); setStatus(message); worker.terminate(); };
     video.addEventListener('seeking', invalidate); video.addEventListener('emptied', invalidate);
     const resize = new ResizeObserver(invalidate); resize.observe(canvas.parentElement!);
     const timeout = window.setTimeout(() => { if (!ready && !disposed) fail('Tracking could not load. Check your connection and retry.'); }, 30_000);
@@ -43,6 +44,7 @@ export function LiveMuscleOverlay({ videoRef, enabled, live = false, onTrackingR
       busy = false;
       if (event.data.generation !== generation) return;
       const poses = event.data.landmarks as Landmark[][];
+      poseRef.current?.(poses, video.videoWidth, video.videoHeight, capturedAtMs);
       const hasPose = poses.length === 1 && poses[0].some(p => (p.visibility ?? 0) >= 0.75);
       const context = canvas.getContext('2d');
       if (!context) { fail('Canvas unavailable.'); return; }
@@ -50,19 +52,18 @@ export function LiveMuscleOverlay({ videoRef, enabled, live = false, onTrackingR
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr); context.scale(dpr, dpr);
       const body = filter.update(poses, video.videoWidth, video.videoHeight, event.data.time);
-      drawMappedBody(context, width, height, video.videoWidth, video.videoHeight, poses, 'dumbbell_curl', body);
-      setView(facing.update(poses, event.data.worldLandmarks ?? [], event.data.time));
-      setMotion(sync.update(poses, video.videoWidth, video.videoHeight, event.data.time));
+      drawMappedBody(context, width, height, video.videoWidth, video.videoHeight, poses, exerciseId, body);
       setMapped(hasPose); setTime(event.data.time);
-      setStatus(poses.length > 1 ? 'Multiple people visible; a single body map is unavailable.' : hasPose ? '' : 'Move into view so your shoulders, elbows and wrists are visible.');
+      setStatus(poses.length > 1 ? 'Multiple people visible; a single body map is unavailable.' : hasPose ? '' : motionGuidance[exerciseId]);
       count++;
       if (performance.now() - rateStart >= 2000) { rateRef.current?.(count * 1000 / (performance.now() - rateStart)); count = 0; rateStart = performance.now(); }
     };
     function tick(now: number) {
       if (disposed) return;
-      if (video!.seeking || video!.readyState < 2) { clear(); setMapped(false); setMotion(null); sync.reset(); }
+      if (video!.seeking || video!.readyState < 2) { clear(); setMapped(false); }
       else if (ready && !busy && video!.currentTime !== lastTime && now - lastRun >= 80) {
         busy = true; lastTime = video!.currentTime; lastRun = now;
+        capturedAtMs = performance.now();
         const frameGeneration = generation, frameTime = video!.currentTime;
         void createImageBitmap(video!).then(bitmap => {
           if (disposed || !ready) { bitmap.close(); return; }
@@ -76,10 +77,10 @@ export function LiveMuscleOverlay({ videoRef, enabled, live = false, onTrackingR
       disposed = true; window.clearTimeout(timeout); cancelAnimationFrame(animation); worker.terminate();
       video.removeEventListener('seeking', invalidate); video.removeEventListener('emptied', invalidate); resize.disconnect(); clear();
     };
-  }, [enabled, videoRef, retry]);
+  }, [enabled, videoRef, exerciseId, retry]);
 
   return <>
-    <ReferenceMotion exerciseId="dumbbell_curl" live status="Keep your shoulders, elbows and wrists visible to follow your curl phase." view={enabled && !failed ? view : null} motion={enabled && !failed ? motion : null} />
+    <ReferenceMotion exerciseId={exerciseId} live loopActive={enabled} />
     <div className="mapped-view">
       <div className="viewer-heading"><span>02 / Body map</span><span>{live ? 'LIVE POSE' : enabled && mapped ? `${time.toFixed(2)}s / SYNCED` : '2D POSE'}</span></div>
       <div className="mapped-stage">
@@ -90,6 +91,7 @@ export function LiveMuscleOverlay({ videoRef, enabled, live = false, onTrackingR
     <div className="muscle-overlay-controls">
       <div className="heatmap-legend"><span><i className="heat-primary" />Primary targets</span><span><i className="heat-secondary" />Supporting muscles</span><span><i className="heat-other" />Other areas</span></div>
       <span className="muted">Educational muscle targets · not measured activation</span>
+      <span className="muted">Dashed outlines show uncertain joint positions.</span>
     </div>
   </>;
 }

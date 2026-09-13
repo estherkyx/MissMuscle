@@ -1,35 +1,38 @@
 import type { ExerciseId, MuscleId } from './exercise-library';
-import { referenceSpatialPose, referenceEquipment, projectReferencePoint } from '../video/reference-spatial';
-import type { SpatialJoint } from '../video/reference-view';
 
-// Original schematic SVGs, not reconstructed body poses or measured activation.
-const ink = '#35543f';
-const skin = '#d8c7a4';
-// Static endpoints consume the animation geometry so the sheet cannot drift.
+// Authored AI illustrations follow the catalogue's variations, not measured poses.
+const movementReferences: Record<ExerciseId, { src: string; alt: string; steps: [string, string] }> = {
+  dumbbell_curl: {
+    src: '/exercise-references/dumbbell-curl.webp',
+    alt: 'Illustrated trainer standing with palms-up dumbbells beside her thighs, then curling both weights toward her shoulders with upper arms beside her torso.',
+    steps: ['Arms extended · palms forward', 'Curl · keep upper arms steady'],
+  },
+  lat_pulldown: {
+    src: '/exercise-references/lat-pulldown.webp',
+    alt: 'Matching front views of an illustrated trainer seated with thighs secured and feet grounded, first holding a wide bar overhead, then pulling it in front toward her upper chest while keeping the same head, torso, and leg orientation.',
+    steps: ['Reach overhead · overhand grip', 'Pull toward upper chest'],
+  },
+  leg_extension: {
+    src: '/exercise-references/leg-extension.webp',
+    alt: 'Side view of an illustrated trainer on a leg-extension machine with back and thighs supported, first with knees bent, then legs extended forward and the roller above her ankles.',
+    steps: ['Set up · roller above ankles', 'Extend · return with control'],
+  },
+  dumbbell_front_squat: {
+    src: '/exercise-references/dumbbell-front-squat.webp',
+    alt: 'Illustrated trainer holding two dumbbells at her shoulders, first standing, then lowering into a squat with thighs around parallel and feet grounded.',
+    steps: ['Stand · weights at shoulders', 'Lower · keep feet grounded'],
+  },
+};
+
 export function FormDiagram({ exercise }: { exercise: ExerciseId }) {
-  const yaw = exercise === 'lat_pulldown' ? -Math.PI/8 : exercise === 'leg_extension' ? -Math.PI/2 : -Math.PI/3;
-  const labels: Record<ExerciseId, [string, string]> = {
-    dumbbell_curl: ['Arm extended', 'Curl · upper arm steady'],
-    lat_pulldown: ['Reach overhead', 'Elbows down · bar at chest'],
-    leg_extension: ['Knee aligned with pivot', 'Straighten · return smoothly'],
-    dumbbell_front_squat: ['Stand · weights at shoulders', 'Thighs parallel · feet grounded'],
-  };
-  return <svg className="reference-image form-diagram" viewBox="0 0 460 260" role="img" aria-label={exercise.replaceAll('_', ' ')+': schematic start and finish positions'}>
-    <rect width="460" height="260" rx="14" fill="#e1e7d5" />
-    <text x="230" y="18" textAnchor="middle" className="diagram-caption">MOVEMENT REFERENCE · SCHEMATIC</text>
-    {[0,1].map(t => {
-      const spatial=referenceSpatialPose(exercise,t);
-      const point=(p: SpatialJoint)=>{const q=projectReferencePoint(p,yaw);return {x:t*230+q.x*220+5,y:24+q.y*205};};
-      const pose=spatial.map(point);
-      return <g key={t}>
-        {referenceEquipment(exercise,spatial).map(([a,b],i)=>{const u=point(a),v=point(b);return <line key={i} x1={u.x} y1={u.y} x2={v.x} y2={v.y} stroke="#8a9d79" strokeWidth="3" strokeLinecap="round" />;})}
-        <path d={[11,12,24,23].map((i,n)=>(n?'L':'M')+pose[i].x+' '+pose[i].y).join(' ')+'Z'} fill={skin} stroke={ink} strokeWidth="2" />
-        {[[23,25],[24,26],[25,27],[26,28],[11,13],[12,14],[13,15],[14,16],[15,19],[16,20],[27,31],[28,32]].map(([a,b])=><line key={a+'-'+b} x1={pose[a].x} y1={pose[a].y} x2={pose[b].x} y2={pose[b].y} stroke={ink} strokeWidth="5" strokeLinecap="round" />)}
-        <ellipse cx={pose[0].x} cy={pose[0].y} rx="8" ry="10" fill={skin} stroke={ink} strokeWidth="2" />
-        <text x={t*230+115} y="247" textAnchor="middle" className="diagram-label">{labels[exercise][t]}</text>
-      </g>;
-    })}
-  </svg>;
+  const reference = movementReferences[exercise];
+  return <figure className="movement-reference">
+    <div className="movement-reference-heading"><span>MOVEMENT REFERENCE</span><span>AI illustration</span></div>
+    <img src={reference.src} alt={reference.alt} width="1536" height="1024" decoding="async" />
+    <figcaption className="movement-reference-steps">
+      {reference.steps.map((step, index) => <span key={step}><b>{index + 1}</b>{step}</span>)}
+    </figcaption>
+  </figure>;
 }
 
 // Reuse the curl target map’s silhouette, colors and legend across the library.

@@ -3,9 +3,11 @@
 ## Full-range demonstration review
 
 All four supported variations use the same source-review standard. The reference
-sheet and animated reference now share `referenceSpatialPose` geometry, including
-their start and finish positions. These are original schematics informed by the
-sources below; source photos or videos are not copied into the product.
+sheet now uses realistic AI-generated trainer illustrations for its start and end
+positions. The animated reference continues to use `referenceSpatialPose` geometry.
+Both follow the variation criteria below, but the static images are not exact
+projections of the animation. Source photos or videos are not copied into the product.
+See [image assets and prompts](../../../public/exercise-references/README.md).
 
 | Variation | Source and authored visual criteria |
 | --- | --- |
@@ -30,7 +32,8 @@ Use the common full-range timing pipeline described in the
 `exercise-library.ts` re-exports the shared catalogue. All four listed variations
 support analysis and voice. The UI and provider use the same versioned criteria;
 see [the multi-exercise handoff](../../../docs/EXERCISES.md).
-`ExerciseDiagrams.tsx` supplies original schematics and muscle-location diagrams.
+`ExerciseDiagrams.tsx` supplies locally bundled movement illustrations with HTML
+phase captions, accessible descriptions, and the existing muscle-location diagrams.
 Exercise changes reset the active clip, report, tracking and voice session.
 
 Targets are lats for pulldowns, quadriceps for leg extensions, and quadriceps and

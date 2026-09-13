@@ -14,6 +14,7 @@ export const LIMITS = {
 export const ExerciseIdSchema = z.enum(['dumbbell_curl', 'lat_pulldown', 'leg_extension', 'dumbbell_front_squat']);
 export const FormCriterionIdSchema = z.enum(['steady_upper_arm', 'neutral_wrist', 'steady_torso', 'relaxed_shoulders', 'controlled_movement', 'stable_torso', 'front_pull', 'even_grip_pull', 'controlled_return', 'machine_alignment', 'supported_torso', 'full_extension', 'smooth_extension', 'front_rack', 'squat_depth', 'squat_posture', 'grounded_feet', 'knee_tracking']);
 export const FormStatusSchema = z.enum(['looks_consistent', 'needs_attention', 'unclear']);
+export type FormCriterionId = z.infer<typeof FormCriterionIdSchema>;
 const Seconds = z.number().finite().min(0).max(LIMITS.clipSeconds);
 const Id = z.string().min(1).max(100);
 
@@ -86,7 +87,7 @@ export const AnalysisReportSchema = z.object({
     ctx.addIssue({ code: 'custom', path: ['formChecks'], message: 'Assess each form criterion exactly once.' });
   }
   for (const check of report.formChecks ?? []) {
-    const minimum = check.status === 'unclear' ? 0 : check.criterionId === 'neutral_wrist' ? 1 : (check.criterionId === 'full_extension' || check.criterionId === 'squat_depth') && check.status === 'needs_attention' ? 3 : 2;
+    const minimum = check.status === 'unclear' ? 0 : check.criterionId === 'neutral_wrist' ? 1 : (check.criterionId === 'squat_depth' || check.criterionId === 'full_extension') ? 3 : 2;
     if ((!report.visibility.assessable && check.status !== 'unclear') || new Set(check.evidence.map(e => e.frameIndex)).size < minimum) {
       ctx.addIssue({ code: 'custom', path: ['formChecks'], message: 'An assessed result requires visible supporting evidence.' });
     }
@@ -151,23 +152,24 @@ export const LiveWindowSchema = z.object({
   sessionId: Id,
   windowId: Id,
   startSec: z.number().finite().nonnegative(),
-  request: AnalysisRequestSchema.refine(value => value.exerciseId === 'dumbbell_curl', 'Live coaching supports dumbbell curls only.'),
+  request: AnalysisRequestSchema,
 }).refine(value => value.windowId === value.request.clipId, 'Window and clip IDs must match.');
 export const InspectionQuestionSchema = z.object({ question: z.string().trim().min(1).max(500) });
 export const LiveInspectionRequestSchema = z.object({ window: LiveWindowSchema, focus: InspectionQuestionSchema.optional() });
 export const LiveInspectionResultSchema = z.object({
   window: z.object({ sessionId: Id, windowId: Id, startSec: z.number().finite().nonnegative() }),
-  report: AnalysisReportSchema.refine(value => value.exerciseId === 'dumbbell_curl', 'Live coaching supports dumbbell curls only.'),
+  report: AnalysisReportSchema,
   answer: z.string().min(1).max(600),
 }).refine(value => value.window.windowId === value.report.clipId, 'Report belongs to another window.');
 export const LiveCoachContextSchema = z.object({
   mode: z.literal('live'),
   guidanceOnly: z.boolean().optional(),
   sessionId: Id,
-  exerciseId: z.literal('dumbbell_curl'),
+  exerciseId: ExerciseIdSchema,
   elapsedSec: z.number().finite().nonnegative(),
   latest: LiveInspectionResultSchema.nullable(),
 }).refine(value => !value.latest || (value.latest.window.sessionId === value.sessionId &&
+  value.latest.report.exerciseId === value.exerciseId &&
   value.latest.window.startSec + value.latest.report.durationSec <= value.elapsedSec + 0.1), 'Findings must belong to the current session and its past.');
 export const SessionCoachContextSchema = z.union([CoachContextSchema, LiveCoachContextSchema]);
 export const RetainedEvidenceSchema = z.object({

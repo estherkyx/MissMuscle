@@ -1,10 +1,10 @@
 # Person A — video and visual experience
 
 Current exercise expansion: see [multi-exercise implementation and handoff](EXERCISES.md).
-All four dropdown variations support uploaded analysis and motion; live coaching remains curl-only.
+All four dropdown variations support uploaded analysis, motion and automatic live coaching.
 The public interface provides automatic spoken live corrections without microphone access.
 Uploaded mapping now scans through the shared packaged pose worker, preserving full-range reference timing.
-`LiveWindow`, live results, and `LiveCoachContext` reject other exercises; uploaded contracts retain all four.
+`LiveWindow`, live results, and `LiveCoachContext` support all four exercises; contexts reject findings for a different exercise.
 Earlier curl-only
 instructions below describe the original build. Real-clip acceptance is still required.
 
@@ -107,4 +107,19 @@ in `SessionReplay`, through `createReplayResources`. Do not allocate these URLs
 in render or `useMemo`: Strict Mode cleanup would revoke URLs reused by the next
 effect setup. The recorder selects a jointly recordable/playable MIME type and
 retains the actual recorder MIME type. Keep recorded frames and evidence offsets
-in source orientation; only live camera/body-map presentation is mirrored.
+in source orientation; only live camera/body-map/reference presentation is mirrored.
+
+Live timing, compact provider output, evidence replay and the additive voice cue
+deadline interface are coordinated in [Person B’s integration update](PERSON_B_STATUS.md#live-timing-and-freshness-integration-update).
+
+
+Live replay retention now uses `createRepActivity` on raw, single-person pose
+samples from the existing overlay worker. `onPose` carries the frame submission
+performance timestamp into the session clock; inferred display joints are not
+used for timing. A lift/lower excursion on either arm can pin the preceding ten
+seconds with `RollingRecording.retainRepThrough`. Walking/scale-change checks
+keep the user's approach to the controls from extending that window. Pinned
+segments survive ring eviction until stop, so stopping much later preserves the
+exercise. This is approximate clip selection, not a form score or rep count.
+If no rep is detected, `SessionReplay` labels the end-of-session fallback.
+No provider request, voice interface or shared evidence contract changed.

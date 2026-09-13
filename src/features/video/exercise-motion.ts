@@ -2,7 +2,7 @@ import type { ExerciseId } from '../../../shared/contracts';
 import type { Landmark } from './muscle-regions';
 import { createCurlSync } from './curl-sync';
 
-export type ExerciseMotion = { progress: number; time: number; direction: string };
+export type ExerciseMotion = { progress: number; time: number; direction: string; inferred?: boolean };
 export const motionGuidance: Record<ExerciseId, string> = {
   dumbbell_curl: 'Keep your shoulder, elbow and wrist visible.',
   lat_pulldown: 'Keep your hips, shoulders, elbows and wrists visible from a front-side view.',
@@ -12,15 +12,15 @@ export const motionGuidance: Record<ExerciseId, string> = {
 
 // Progress drives an illustration only. Projected angles are not form thresholds.
 // Keep the selected side until reset; occlusion must not switch reference timing.
-export function createExerciseSync(exerciseId: ExerciseId) {
-  if (exerciseId === 'dumbbell_curl') return createCurlSync();
+export function createExerciseSync(exerciseId: ExerciseId, minVisibility = 0.75) {
+  if (exerciseId === 'dumbbell_curl') return createCurlSync(minVisibility);
   let side: number | undefined;
   let previous: { value: number; time: number } | undefined;
   return {
     reset() { side = undefined; previous = undefined; },
     update(poses: Landmark[][], width: number, height: number, time: number): ExerciseMotion | null {
       const p = poses.length === 1 ? poses[0] : [];
-      const visible = (indices: number[]) => indices.every(i => p[i] && (p[i].visibility ?? 0) >= 0.75 &&
+      const visible = (indices: number[]) => indices.every(i => p[i] && (p[i].visibility ?? 0) >= minVisibility &&
         Number.isFinite(p[i].x) && Number.isFinite(p[i].y) && p[i].x >= 0 && p[i].x <= 1 && p[i].y >= 0 && p[i].y <= 1);
       const required = (s: number) => exerciseId === 'lat_pulldown' ? [23+s, 11+s, 13+s, 15+s] :
         exerciseId === 'dumbbell_front_squat' ? [11+s, 23+s, 25+s, 27+s] : [23+s, 25+s, 27+s];

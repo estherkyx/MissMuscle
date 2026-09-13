@@ -102,7 +102,7 @@ export function createLiveEventProcessor(handlers: LiveEventHandlers) {
                 const { question } = InspectionQuestionSchema.parse(JSON.parse(call.arguments));
                 const findings = LiveInspectionResultSchema.parse(await handlers.onInspect(question));
                 const current = handlers.getContext();
-                if (!('mode' in current) || current.sessionId !== findings.window.sessionId ||
+                if (!('mode' in current) || current.sessionId !== findings.window.sessionId || current.exerciseId !== findings.report.exerciseId ||
                     current.elapsedSec - (findings.window.startSec + findings.report.durationSec) > 15) throw new Error('Findings are no longer current');
                 result = { status: 'completed', findings };
               } catch { result = { status: 'error', message: 'A fresh visual assessment is unavailable. Explain the limitation; do not invent a correction.' }; }
