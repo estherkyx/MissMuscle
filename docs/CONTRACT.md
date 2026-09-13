@@ -5,17 +5,18 @@ Both sides import the types and schemas. All HTTP paths are same-origin.
 
 ## Endpoints
 
-| Endpoint | Input | Output | Starter behaviour |
+| Endpoint | Input | Output | Current behaviour |
 | --- | --- | --- | --- |
-| `GET /api/health` | None | Capability status | 200; reports analysis/voice unimplemented |
+| `GET /api/health` | None | Capability status | 200; reports configuration, not verified model access |
 | `GET /api/demo-report` | None | `AnalysisReport` | 200; always `source: fixture` |
-| `POST /api/analyze` | `AnalysisRequest` JSON | `AnalysisReport` | Validates input; 501 until implemented |
-| `POST /api/live/session` | `LiveSessionRequest` JSON | `LiveSessionResponse` | Validates input; 501 until implemented |
+| `POST /api/analyze` | `AnalysisRequest` JSON | `AnalysisReport` | Real Astra image analysis and output validation |
+| `POST /api/live/session` | `LiveSessionRequest` JSON | `LiveSessionResponse` | Real GPT-Live WebRTC session with Responses delegation |
 
 Failure envelope: `{ "error": { "code": "INVALID_REQUEST", "message": "..." } }`.
 Bad JSON/schema gets 400, wrong content type 415, oversized payload 413, missing
-route 404, unfinished provider integrations 501. Provider output validation failures
-get 502. Person B adds meaningful upstream error mapping inside the services.
+route 404, missing/rejected keys or model access 503, rate/quota limits 429,
+provider timeout 504, model refusal 422, and invalid provider output or upstream
+failures 502.
 
 ## Video → analysis
 
@@ -37,8 +38,9 @@ The original clip stays local to the browser. Person A supplies oriented/scaled
 frames with the same aspect ratio as the displayed clip. Maximum 16 frames,
 768px per edge, 350,000 characters per data URL, and 6 MiB per JSON request.
 If the encoded image is too large, lower JPEG quality/size before submitting.
-Person B must verify actual image decoding/provider acceptance; syntax validation
-alone cannot establish that an image is valid.
+The service checks JPEG boundary bytes and sends the images to Astra; this is not
+a full local image decoder. Provider acceptance has been checked with a valid
+diagnostic image. Actual exercise footage still needs end-to-end testing.
 
 `frameIndex` is zero-based in this exact request array. The report must carry the
 same clip ID, exercise ID, and duration. The server checks that evidence timestamps
@@ -104,7 +106,31 @@ Our server → browser:
 
 Person B translates these into the current upstream API shape. Keep keys server-side.
 The voice adapter owns provider connection teardown. If a server close/delegation
-route is required, add and document it with Person A; do not fake upstream schemas.
+route becomes necessary, coordinate it with Person A. The current adapter uses
+the data channel's `session.close` and waits for `session.closed` before releasing
+the transport, with a bounded timeout that reports unconfirmed finalization.
+
+## Implemented adapter details for Person A
+
+- Call `connectCoach` from a Start button to request microphone access. Await it
+  before storing the connection; handle a rejected promise in the UI.
+- Optional `onError(message)` gives recoverable audio-playback guidance or failure
+  text. Optional `signal: AbortSignal` cancels startup/unmount without changing
+  existing callers. These are the only public interface additions.
+- Pass the latest context to `updateContext` after selection and playback changes.
+  Selection is sent immediately; time updates are throttled to once per second.
+  Changing the report/clip requires ending the old session first.
+- Transcript callbacks are text fragments, including their original spaces, with
+  `final: false`. Append them; do not replace the whole caption or invent a
+  completed turn. Speaking/listening status reflects received audio activity.
+- Await `disconnect()` from the End button. Mute begins immediately, followed by
+  device release after finalization. If the connection fails or closing times out,
+  surface the error; local microphone cleanup does not prove final provider usage.
+- Abort the startup controller on unmount and also disconnect any resolved
+  connection. Cancellation during an in-flight handshake retains the muted
+  transport long enough to close a late-created session.
+- Tool outputs confirm dispatch to `onCommand`, not completion of browser seeking.
+  Keep the UI's context current so the coach can see subsequent playback state.
 
 ## Change coordination
 
