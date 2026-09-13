@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 260" role="img" aria-labelledby="title desc">
+  <title id="title">Target muscles of the front upper arm</title>
+  <desc id="desc">An approximate upper-arm diagram highlights biceps brachii. A dashed inner area represents brachialis underneath. Both help bend the elbow. This is not muscle activation measured from footage.</desc>
+  <rect width="600" height="260" rx="20" fill="#eef2e7"/>
+  <path d="M105 42 Q154 15 182 57 L194 176 Q182 198 151 202 L115 239 L75 226 L136 174 L112 91Z" fill="#e4c7a7" stroke="#38533e" stroke-width="3"/>
+  <ellipse cx="155" cy="111" rx="24" ry="58" fill="#8ca75c"/>
+  <ellipse cx="162" cy="154" rx="24" ry="30" fill="none" stroke="#9a542f" stroke-width="3" stroke-dasharray="5 4"/>
+  <g fill="none" stroke-width="2"><path d="M179 104 H264" stroke="#547234"/><path d="M184 158 H264" stroke="#9a542f"/></g>
+  <g font-family="system-ui, sans-serif" fill="#213b30"><text x="280" y="103" font-size="20">Biceps brachii</text><text x="280" y="126" font-size="14">Front of the upper arm</text><text x="280" y="165" font-size="20">Brachialis</text><text x="280" y="188" font-size="14">Underneath the biceps</text><text x="300" y="242" font-size="13" text-anchor="middle">APPROXIMATE ANATOMY · NOT MEASURED ACTIVATION</text></g>
+</svg>
