@@ -1,19 +1,17 @@
 import type { AnalysisReport, Correction } from '../../../shared/contracts';
-import { curlReference, curlSources } from './curl-reference';
+import { EXERCISES, type ExerciseReference } from './exercise-library';
+import { FormDiagram, MuscleDiagram } from './ExerciseDiagrams';
 
-export function ReferenceGuide() {
+export function ReferenceGuide({ exercise = EXERCISES[0] }: { exercise?: ExerciseReference }) {
   return <section className="reference-guide" aria-labelledby="reference-title">
     <span className="reference-number">01 / Technique</span><h3 id="reference-title">Target form</h3>
-    <img className="reference-image" src="/curl-reference.svg" alt="Schematic curl: keep the torso and upper arm steady while bending at the elbow, then lower with control." />
-    <p className="muted">Steady upper arm. Aligned wrist. Controlled movement.</p>
+    <FormDiagram exercise={exercise.id} />
+    <p className="muted">{exercise.summary}</p>
     <details><summary>Technique notes & sources</summary>
-      <p>These criteria apply to a basic palms-up curl. Intentional forward-elbow curls and other variations need a different comparison.</p>
-      {curlReference.criteria.map(criterion => <article className="criterion" key={criterion.id}>
-        <h4>{criterion.title}</h4><p><strong>Aim for:</strong> {criterion.expected}</p>
-        <p><strong>Look for:</strong> {criterion.deviation}</p><p className="muted"><strong>Evidence needed:</strong> {criterion.visibility}</p>
-        <div className="source-links">{criterion.sources.map(source => <a key={source} href={curlSources[source].url} target="_blank" rel="noreferrer">{curlSources[source].title}</a>)}</div>
-      </article>)}
-      <p className="muted">Reference version {curlReference.version} · checked {curlReference.reviewedOn}. These are technique checks, not estimates of how common each fault is.</p>
+      <p>{exercise.label} · {exercise.variation}</p>
+      {exercise.notes.map(note => <article className="criterion" key={note.title}><h4>{note.title}</h4><p>{note.text}</p></article>)}
+      <div className="source-links">{exercise.sources.map(source => <a key={source.url} href={source.url} target="_blank" rel="noreferrer">{source.title}</a>)}</div>
+      <p className="muted">Educational schematic and source-based guidance, not a personalised ideal pose.</p>
     </details>
   </section>;
 }
@@ -47,10 +45,11 @@ export function ReviewPanel({ report, correction, evidenceIndex, showKeyframe, h
   </section>;
 }
 
-export function MuscleGuide() {
-  return <section className="muscle-guide"><span className="reference-number">02 / Your focus</span><h3>Target muscles</h3>
-    <img className="reference-image" src="/target-muscles.svg" alt="Approximate upper-arm anatomy: biceps brachii at the front, with brachialis underneath." />
-    <p className="muted">Primary focus: biceps. Brachialis assists elbow flexion. This is an anatomy guide, not measured muscle activation.</p>
-    <a href={curlSources.anatomy.url} target="_blank" rel="noreferrer">Anatomy reference: OpenStax</a>
+export function MuscleGuide({ exercise = EXERCISES[0] }: { exercise?: ExerciseReference }) {
+  const multiple = exercise.muscles.length > 1;
+  return <section className="muscle-guide"><span className="reference-number">02 / Anatomy</span><h3>Target muscles</h3>
+    {multiple ? <div className="muscle-diagrams">{exercise.muscles.map(muscle => <figure key={muscle.id}><MuscleDiagram focus={muscle.id} compact /><figcaption>{muscle.label}</figcaption></figure>)}</div> : <MuscleDiagram focus={exercise.muscles[0].id} />}
+    {exercise.muscles.map(muscle => <p className="muted" key={muscle.id}><strong>{muscle.label}.</strong> {muscle.description}</p>)}
+    <p className="anatomy-note">An anatomy guide, not measured muscle activation.</p>
   </section>;
 }

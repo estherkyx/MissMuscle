@@ -12,10 +12,14 @@ The **video/review interface, Astra analysis service, and GPT-Live voice adapter
 are integrated locally**. Real exercise-flow acceptance and Sites deployment remain.
 See [current verification and next steps](docs/PERSON_B_STATUS.md).
 
-The interface starts with exercise and primary-muscle selectors. Only the standing
-palms-up dumbbell curl with biceps focus is enabled in this prototype. Video is the
-main review surface; correction rows below it seek to evidence, compact voice
-controls sit beside the video actions, and form/muscle references live at the bottom.
+The interface starts with an exercise selector. Dumbbell curl
+(biceps) supports analysis. Lat pulldown (lats), leg extension (quadriceps), and
+dumbbell front squat (quadriceps and glutes) have reference sheets only. Each sheet
+includes an original schematic, muscle guide, and linked technique sources.
+Selecting a reference-only exercise clears old findings and disables upload and
+analysis. The server contract remains curl-only. Video is the main review surface
+for curls; correction rows below it seek to evidence, compact voice controls sit
+beside the video actions, and form/muscle references live at the bottom.
 
 ```sh
 npm ci

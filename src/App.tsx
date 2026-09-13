@@ -6,7 +6,7 @@ import { extractFrames, loadLocalClip, waitForMedia, type LocalClip } from './fe
 import { createPlaybackController } from './features/video/playback';
 import { CoachPanel, type CoachPanelHandle } from './features/review/CoachPanel';
 import { MuscleGuide, ReferenceGuide, ReviewPanel } from './features/review/ReviewPanel';
-import { curlReference } from './features/review/curl-reference';
+import { EXERCISES, getExercise, canAnalyzeExercise } from './features/review/exercise-library';
 import { EvidenceOverlay } from './features/video/EvidenceOverlay';
 
 type Mode = 'analysis' | 'sample';
@@ -15,7 +15,10 @@ const messageOf = (error: unknown) => error instanceof Error ? error.message : '
 
 export default function App() {
   const [exercise, setExercise] = useState('');
-  const [targetMuscle, setTargetMuscle] = useState('');
+  const selectedExercise = getExercise(exercise);
+  const reference = selectedExercise ?? EXERCISES[0];
+  const referenceOnly = !!selectedExercise && !selectedExercise.analysisAvailable;
+  const analysisEnabled = canAnalyzeExercise(exercise);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<Mode>('analysis');
   const [clip, setClip] = useState<LocalClip | null>(null);
@@ -92,13 +95,18 @@ export default function App() {
     activeClip.current = null;
     setClip(null); setReady(false); setRequest(null); setSelection(null);
     setPlayback({ time: 0, paused: true, seeking: false });
-    if (nextMode === 'sample') { setExercise('dumbbell_curl'); setTargetMuscle('biceps'); }
+    if (nextMode === 'sample') setExercise('dumbbell_curl');
     setMode(nextMode); setReport(nextMode === 'sample' ? demoReport : null);
     setProgress(0); setPhase('idle');
     return current;
   }
 
+  async function changeExercise(id: string) {
+    if (await reset('analysis') !== null) setExercise(id);
+  }
+
   async function chooseFile(file: File, nextMode: Mode) {
+    if (!analysisEnabled) return;
     const current = await reset(nextMode);
     if (current === null) return;
     const abort = new AbortController();
@@ -119,7 +127,7 @@ export default function App() {
   }
 
   async function analyze() {
-    if (!clip || mode !== 'analysis' || phase === 'extracting' || phase === 'analyzing') return;
+    if (!analysisEnabled || !clip || mode !== 'analysis' || phase === 'extracting' || phase === 'analyzing') return;
     const current = ++generation.current;
     const submittedClip = clip;
     extraction.current?.abort();
@@ -177,61 +185,57 @@ export default function App() {
   const evidence = correction?.evidence[selection?.index ?? 0];
   const showKeyframe = !!evidence && playback.paused && !playback.seeking && Math.abs(playback.time - evidence.timestampSec) <= 0.05;
   const context = useMemo(() => {
-    if (!report || !clip || !ready) return null;
+    if (!analysisEnabled || !report || !clip || !ready) return null;
     const result = CoachContextSchema.safeParse({ report, currentTimeSec: Math.min(report.durationSec, Math.max(0, playback.time)), selectedCorrectionId: correction?.id ?? null });
     return result.success ? result.data : null;
-  }, [report, clip, ready, playback.time, playback.paused, playback.seeking, correction?.id]);
+  }, [analysisEnabled, report, clip, ready, playback.time, playback.paused, playback.seeking, correction?.id]);
   const working = phase === 'loading' || phase === 'extracting' || phase === 'analyzing';
 
-  const configured = exercise === 'dumbbell_curl' && targetMuscle === 'biceps';
+  const configured = !!selectedExercise;
   const progressText = phase === 'loading' ? 'Preparing video…' : phase === 'extracting' ? `Preparing frames · ${progress}/${LIMITS.maxFrames}` : phase === 'analyzing' ? 'Reviewing your form…' : '';
 
   return <main>
     <header><a className="brand" href="/">MissMuscle<span>✳</span></a><span className="tag">A little guidance. A stronger next rep.</span><a className="reference-link" href="#reference-sheet">Reference sheet ↗</a></header>
     <section className="intro"><p className="eyebrow">Your personal form coach</p><h1>Make your next rep <em>better.</em></h1></section>
-    <section className="exercise-setup" aria-label="Choose your exercise and focus">
-      <label><span className="field-label">01 / Exercise</span><select value={exercise} disabled={working} onChange={event => { setExercise(event.target.value); setTargetMuscle(''); void reset('analysis'); }}>
-        <option value="" disabled>Choose an exercise</option><option value="dumbbell_curl">Dumbbell curl</option><option disabled>Shoulder press · coming soon</option><option disabled>Squat · coming soon</option>
+    <section className="exercise-setup" aria-label="Choose your exercise">
+      <label><span className="field-label">Exercise</span><select value={exercise} disabled={working} onChange={event => void changeExercise(event.target.value)}>
+        <option value="" disabled>Choose an exercise</option>{EXERCISES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
       </select></label>
-      <label><span className="field-label">02 / Primary muscle</span><select value={targetMuscle} disabled={!exercise || working} onChange={event => { setTargetMuscle(event.target.value); void reset('analysis'); }}>
-        <option value="" disabled>Choose your focus</option><option value="biceps">Biceps</option><option disabled>Brachialis · hammer curl coming soon</option>
-      </select></label>
-      <div className="variation-note"><span className="field-label">Your variation</span><span>{configured ? 'Standing · palms-up curl' : 'Select your exercise & focus'}</span><small>{configured ? 'Biceps focus' : 'More exercises on the way'}</small></div>
     </section>
     <section className="video-workspace" id="movement-video" aria-labelledby="video-title">
-      <div className="video-toolbar"><div><span className="eyebrow">Your movement</span><h2 id="video-title">{clip ? 'Let’s look at your form.' : 'Start with a short clip.'}</h2></div>
+      <div className="video-toolbar"><div><span className="eyebrow">Your movement</span><h2 id="video-title">{referenceOnly ? reference.label : clip ? 'Let’s look at your form.' : 'Start with a short clip.'}</h2></div>
         <div className="actions">{clip && <button className="secondary small-button" disabled={working} onClick={() => fileInputRef.current?.click()}>Replace video</button>}
-        <button className="text-button" aria-pressed={mode === 'sample'} disabled={working} onClick={() => void reset(mode === 'sample' ? 'analysis' : 'sample')}>{mode === 'sample' ? 'Exit sample' : 'Try a sample report ↗'}</button></div>
+        <button className="text-button" aria-pressed={mode === 'sample'} disabled={working} onClick={() => void reset(mode === 'sample' ? 'analysis' : 'sample')}>{mode === 'sample' ? 'Exit sample' : 'Try a curl sample ↗'}</button></div>
       </div>
       {mode === 'sample' && <p className="sample-banner">Fictional sample findings — not an assessment of your clip. Add a 12–15s video to try playback.</p>}
-      <input ref={fileInputRef} className="visually-hidden" type="file" accept="video/*,.mp4,.mov,.webm,.m4v" disabled={!configured || working} aria-label="Choose exercise video" onChange={event => {
+      <input ref={fileInputRef} className="visually-hidden" type="file" accept="video/*,.mp4,.mov,.webm,.m4v" disabled={!analysisEnabled || working} aria-label="Choose exercise video" onChange={event => {
         const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void chooseFile(file, mode);
       }} />
-      {clip ? <div className="player"><video key={clip.id} ref={videoRef} src={clip.url} controls playsInline preload="auto" aria-label="Your local curl clip"
+      {clip ? <div className="player"><video key={clip.id} ref={videoRef} src={clip.url} controls playsInline preload="auto" aria-label="Your local exercise clip"
         onLoadedData={() => { setReady(true); syncPlayback(true); }}
         onTimeUpdate={() => syncPlayback()} onPlay={() => syncPlayback(true)} onPause={() => syncPlayback(true)}
         onSeeking={() => syncPlayback(true)} onSeeked={() => syncPlayback(true)} onEnded={() => syncPlayback(true)}
         onError={() => { setReady(false); setPlaybackError('This video cannot be played here. Try an H.264 MP4 export.'); }} />
         <EvidenceOverlay report={report} request={request} correction={correction} evidenceIndex={selection?.index ?? 0} visible={showKeyframe} />
         {showKeyframe && correction && <div className="frame-label">{mode === 'sample' ? 'Sample moment' : 'Evidence'} · {evidence!.timestampSec.toFixed(2)}s <span>{correction.title}</span></div>}
-      </div> : <div className="video-placeholder">
+      </div> : <div className={`video-placeholder${referenceOnly ? ' reference-placeholder' : ''}`}>
         <div className="upload-symbol" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M20 27V9m-7 7 7-7 7 7M9 27v5h22v-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></div>
-        <h3>Your next rep starts here.</h3><p>{configured ? 'Keep your working arm and torso in view.' : 'Choose an exercise and muscle above.'}</p>
-        <button disabled={!configured || working} onClick={() => fileInputRef.current?.click()}>Upload video <span aria-hidden="true">↗</span></button><small>{mode === 'sample' ? '12–15 seconds' : 'Up to 15 seconds'} · max 40 MiB</small>
+        <h3>{referenceOnly ? 'Get to know the movement.' : 'Your next rep starts here.'}</h3><p>{referenceOnly ? 'Form and muscle guides are ready. Video analysis is coming later.' : configured ? 'Keep your working arm and torso in view.' : 'Choose an exercise above.'}</p>
+        {referenceOnly ? <a className="reference-cta" href="#reference-sheet">View reference sheet ↓</a> : <><button disabled={!analysisEnabled || working} onClick={() => fileInputRef.current?.click()}>Upload video <span aria-hidden="true">↗</span></button><small>{mode === 'sample' ? '12–15 seconds' : 'Up to 15 seconds'} · max 40 MiB</small></>}
       </div>}
-      <div className="video-bottom"><div className="analysis-controls">
-        {mode === 'analysis' && <button disabled={!clip || !ready || working || !configured} onClick={() => void analyze()}>{phase === 'analyzing' || phase === 'extracting' ? 'Analyzing…' : report ? 'Analyze again' : 'Analyze clip'} <span aria-hidden="true">↗</span></button>}
+      {!referenceOnly && <div className="video-bottom"><div className="analysis-controls">
+        {mode === 'analysis' && <button disabled={!clip || !ready || working || !analysisEnabled} onClick={() => void analyze()}>{phase === 'analyzing' || phase === 'extracting' ? 'Analyzing…' : report ? 'Analyze again' : 'Analyze clip'} <span aria-hidden="true">↗</span></button>}
         <span className="clip-meta">{clip ? `${clip.name} · ${clip.durationSec.toFixed(1)}s` : 'Your video stays on your device.'}</span>
-      </div><CoachPanel key={`${mode}:${clip?.id ?? 'none'}:${report?.id ?? 'none'}`} ref={coachRef} context={context} onCommand={handleCoachCommand} /></div>
+      </div><CoachPanel key={`${mode}:${clip?.id ?? 'none'}:${report?.id ?? 'none'}`} ref={coachRef} context={context} onCommand={handleCoachCommand} /></div>}
       {progressText && <p role="status" className="progress-status">{progressText}</p>}
       {phase === 'extracting' && <progress value={progress} max={LIMITS.maxFrames} aria-label="Frame extraction progress" />}
       {error && <p className="error" role="alert">{error}</p>}{playbackError && <p className="error" role="alert">{playbackError}</p>}
-      <details className="recording-tips"><summary>Recording tips & privacy</summary><p>{curlReference.camera}</p><p>Only selected images are sent for analysis when you choose Analyze clip. Your original video stays in this browser.</p></details>
+      {!referenceOnly && <details className="recording-tips"><summary>Recording tips & privacy</summary><p>{reference.camera}</p><p>Only selected images are sent for analysis when you choose Analyze clip. Your original video stays in this browser.</p></details>}
     </section>
-    <section className="corrections-section" aria-label="Video corrections">
+    {!referenceOnly && <section className="corrections-section" aria-label="Video corrections">
       {report ? <ReviewPanel report={report} correction={correction} evidenceIndex={selection?.index ?? 0} showKeyframe={showKeyframe} hasVideo={!!clip} onCorrection={showCorrection} onEvidence={showEvidence} /> : <div className="corrections-empty"><div><p className="eyebrow">Your next rep</p><h2>Small adjustments. Better movement.</h2></div><p>Your corrections will appear here.<br />Tap one to jump to that moment.</p></div>}
-    </section>
-    <section id="reference-sheet" className="reference-sheet" aria-labelledby="reference-sheet-title"><div className="reference-heading"><div><p className="eyebrow">Keep this handy</p><h2 id="reference-sheet-title">Your reference sheet</h2></div><span className="reference-pill">Standing curl / Biceps</span></div><div className="reference-grid"><ReferenceGuide /><MuscleGuide /></div></section>
+    </section>}
+    <section id="reference-sheet" className="reference-sheet" aria-labelledby="reference-sheet-title"><div className="reference-heading"><div><p className="eyebrow">Keep this handy</p><h2 id="reference-sheet-title">Your reference sheet</h2></div><span className="reference-pill">{reference.shortLabel} / {reference.muscles.map(item => item.label).join(' & ')}</span></div><div className="reference-grid"><ReferenceGuide exercise={reference} /><MuscleGuide exercise={reference} /></div></section>
     <footer><span>MissMuscle ✳</span><span>Educational form guidance</span></footer>
   </main>;
 }

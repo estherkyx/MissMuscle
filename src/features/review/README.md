@@ -1,5 +1,31 @@
 # Person A: sourced curl comparison and review
 
+## Exercise library update
+
+`exercise-library.ts` is a browser-side catalogue. It adds lat pulldown, seated
+leg extension, and dumbbell front squat without adding any new analysis models,
+request exercise IDs, or provider routes. `ExerciseDiagrams.tsx` supplies original
+schematics and approximate muscle-location diagrams. Exercise changes
+reset the active clip/report, and reference-only selections do not expose analysis
+or voice controls. Returning to dumbbell curl restores the existing analysis flow.
+
+Targets are lats for pulldowns, quadriceps for leg extensions, and quadriceps and
+glutes for the front squat. The squat reference specifies two dumbbells held at
+shoulder height. All target muscles are shown together in the reference sheet, without a separate
+muscle selector. No unsupported
+quadriceps-head or lat-region targeting options are offered.
+
+New references (paraphrased; no source imagery copied):
+
+- [ACE seated lat pulldown](https://www.acefitness.org/resources/everyone/exercise-library/158/seated-lat-pulldown/)
+- [NASM pulldown biomechanics](https://www.nasm.org/resource-center/blog/training/the-biomechanics-of-the-lat-pulldown-muscles-grip-and-form)
+- [Life Fitness Optima manual, leg extension on printed page 17](https://www.lifefitness.com.au/wp-content/uploads/2015/02/Optima_user_manual_for_all_strength_2_585_1371787541.pdf#page=18)
+- [NASM dumbbell front squat](https://www.nasm.org/resource-center/exercise-library/dumbbell-front-squat)
+
+Machine setup follows the equipment's own labels; the illustrated leg-extension
+machine is schematic. These references are educational prototypes, not validated
+pose assessments or trainer sign-off.
+
 [ReviewPanel](ReviewPanel.tsx) consumes `AnalysisReport` directly and displays
 timestamped corrections linked to the main video, reference guidance,
 visibility limitations, and next-attempt focus. Unassessable reports and assessable
