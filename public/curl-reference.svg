@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 320" role="img" aria-labelledby="title desc">
+  <title id="title">Basic curl reference: lower and lift</title>
+  <desc id="desc">Schematic side views show a steady torso and upper arm with the forearm bending upward at the elbow. These are educational positions, not measured joint angles.</desc>
+  <rect width="600" height="320" rx="20" fill="#eef2e7"/>
+  <g fill="none" stroke="#38533e" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="145" cy="63" r="22" fill="#e4c7a7" stroke-width="3"/>
+    <path d="M145 91 L145 211 M145 211 L122 278 M145 211 L168 278 M154 109 L161 175 L168 240"/>
+    <circle cx="415" cy="63" r="22" fill="#e4c7a7" stroke-width="3"/>
+    <path d="M415 91 L415 211 M415 211 L392 278 M415 211 L438 278 M424 109 L431 175 L478 125"/>
+  </g>
+  <g stroke="#779945" stroke-width="5" fill="none"><path d="M161 175 L212 128" stroke-dasharray="6 5"/><path d="M211 216 Q241 174 222 147 M222 147 L219 166 M222 147 L239 154"/></g>
+  <g fill="#bd703f"><circle cx="161" cy="175" r="7"/><circle cx="431" cy="175" r="7"/></g>
+  <g stroke="#233b31" stroke-width="7" stroke-linecap="round"><path d="M151 244 L185 235 M152 233 L157 252 M179 226 L184 245 M463 112 L492 139 M458 120 L471 105 M484 146 L498 130"/></g>
+  <g font-family="system-ui, sans-serif" fill="#213b30" text-anchor="middle"><text x="145" y="307" font-size="16">Lower with control</text><text x="425" y="307" font-size="16">Bend at the elbow</text><text x="300" y="24" font-size="13">REFERENCE · SCHEMATIC</text></g>
+</svg>
