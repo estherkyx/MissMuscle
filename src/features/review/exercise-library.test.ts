@@ -19,7 +19,7 @@ test('each new exercise renders its own form reference and source, with no curl 
     assert.match(html, /MOVEMENT REFERENCE/);
     assert.doesNotMatch(html, /curl-reference.svg/);
     const animation = renderToStaticMarkup(createElement(ReferenceMotion, { exerciseId: exercise.id }));
-    assert.ok(animation.includes(exercise.summary));
+    assert.ok(animation.includes('Proper ' + exercise.label + ' form demonstration'));
     assert.doesNotMatch(animation, /upper arms beside the body|visible arm|curl movement/i);
   }
 });

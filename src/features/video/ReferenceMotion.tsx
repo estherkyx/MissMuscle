@@ -34,9 +34,5 @@ export function ReferenceMotion({ exerciseId, live = false, view = null, motion 
       {!motion && <div className="mapped-empty"><strong>{live ? 'Live movement reference' : 'Full-range reference'}</strong><p>{status}</p></div>}
       <span className="reference-phase">{motion ? `${motion.direction} / ${view ? view.held ? 'facing briefly held' : 'approximate facing synced' : 'facing unavailable'}` : live ? 'Reference waits for your movement' : 'Reference waits for your clip'}</span>
     </div>
-    <div className="reference-motion-controls">
-      <p>{exercise.summary}</p>
-      <p>{live ? 'Reference follows your visible curl phase. Timing and facing are approximate.' : 'Full target range · timing matched to your clip. The reference demonstrates complete movement even when your repetition is partial. Use the original video controls to play, pause or seek all three views. Timing and facing are approximate.'}</p>
-    </div>
   </section>;
 }

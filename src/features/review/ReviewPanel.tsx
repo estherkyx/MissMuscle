@@ -8,7 +8,6 @@ export function ReferenceGuide({ exercise = EXERCISES[0] }: { exercise?: Exercis
   return <section className="reference-guide">
     <p className="reference-variation">{exercise.variation}</p>
     <div className="reference-visuals"><FormDiagram exercise={exercise.id} /><div className="reference-anatomy">{exercise.muscles.map(muscle => <MuscleDiagram key={muscle.id} focus={muscle.id} compact />)}</div></div>
-    <p>{exercise.summary}</p>
     <div className="reference-muscles">{exercise.muscles.map(muscle => <p key={muscle.id}><strong>{muscle.label}.</strong> {muscle.description}</p>)}</div>
     <h3>Technique & best practices</h3>
     <ul className="technique-list">{exercise.notes.map(note => <li key={note.title}><strong>{note.title}</strong><p>{note.text}</p></li>)}</ul>
