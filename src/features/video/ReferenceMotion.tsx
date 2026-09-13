@@ -1,0 +1,35 @@
+import { useEffect, useRef } from 'react';
+import { drawMappedBody } from './mapped-body';
+import { referenceCurlPose } from './reference-pose';
+import type { CurlMotion } from './curl-sync';
+
+export function ReferenceMotion({ motion }: { motion: CurlMotion | null }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current!;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    const draw = () => {
+      const width = canvas.parentElement!.clientWidth, height = canvas.parentElement!.clientHeight;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(width*dpr); canvas.height = Math.round(height*dpr);
+      context.scale(dpr, dpr);
+      drawMappedBody(context, width, height, 3, 4, motion ? [referenceCurlPose(motion.progress)] : []);
+    };
+    draw();
+    const resize = new ResizeObserver(draw); resize.observe(canvas.parentElement!);
+    return () => resize.disconnect();
+  }, [motion]);
+  return <section className="reference-motion" aria-label="Reference curl form animation">
+    <div className="viewer-heading"><span>03 / Reference form</span><span>{motion ? `${motion.time.toFixed(2)}s / SYNCED` : 'WAITING'}</span></div>
+    <div className="mapped-stage">
+      <canvas ref={canvasRef} aria-label="Reference form following the detected curl movement" />
+      {motion ? <span className="reference-phase">{motion.direction} · following your movement</span> : <div className="mapped-empty"><strong>Waiting for curl movement</strong><p>Start body mapping. Keep your shoulder, elbow and wrist visible.</p></div>}
+    </div>
+    <div className="reference-motion-controls">
+      <p>Use the original video controls. All three views follow the same timeline.</p>
+      <p>Steady torso · upper arms beside the body · aligned wrists</p>
+      <p>Illustrated form follows the visible arm’s bend and pace. Timing is approximate from the camera view, not a prescribed exercise speed. Hidden arms hide the reference.</p>
+    </div>
+  </section>;
+}

@@ -58,7 +58,7 @@ export function ReviewPanel({ report, correction, evidenceIndex, request, showKe
 
 export function MuscleGuide() {
   return <section className="muscle-guide"><h3>Target muscles</h3>
-    <img className="reference-image" src="/target-muscles.svg" alt="Approximate upper-arm anatomy: biceps brachii at the front, with brachialis underneath." />
+    <img className="reference-image" src="/target-muscles.svg" alt="Curl target map: red upper arms indicate the primary target area, yellow forearms indicate supporting muscles, and gray shows other areas." />
     <p className="muted">Biceps brachii and brachialis help bend the elbow. This educational diagram does not measure muscle activation from your video.</p>
     <a href={curlSources.anatomy.url} target="_blank" rel="noreferrer">Anatomy reference: OpenStax</a>
   </section>;

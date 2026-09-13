@@ -17,12 +17,13 @@ test('invalid analysis input fails before calling a provider', async () => {
   assert.equal(response.status, 400);
   assert.equal((await response.json() as { error: { code: string } }).error.code, 'INVALID_REQUEST');
 });
-test('valid analysis input gets explicit 501 instead of fabricated findings', async () => {
+test('analysis without a key returns a configuration error instead of fabricated findings', async () => {
   const response = await worker.fetch(post('/api/analyze', {
     clipId: 'test', exerciseId: 'dumbbell_curl', durationSec: 5,
     frames: [0, 2].map(timestampSec => ({ timestampSec, dataUrl: 'data:image/jpeg;base64,/9j/AA==', width: 1, height: 1 })),
   }));
-  assert.equal(response.status, 501);
+  assert.equal(response.status, 503);
+  assert.equal((await response.json() as { error: { code: string } }).error.code, 'ANALYSIS_NOT_CONFIGURED');
 });
 test('unfinished voice integration does not create a fake session', async () => {
   const response = await worker.fetch(post('/api/live/session', { sdpOffer: 'test-offer', context: { report: demoReport, currentTimeSec: 0, selectedCorrectionId: null } }));

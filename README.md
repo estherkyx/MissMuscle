@@ -101,8 +101,9 @@ reconstruction, workout history/accounts, arbitrary gym machines, and image gene
 
 What remains: video upload/extraction, visual overlays/reference assets, real Astra
 calls, real GPT-Live audio and command handling, comparison, and Sites deployment.
-Analysis and voice endpoints intentionally return **501 Not Implemented** until
-Person B connects them. A configured key alone does not enable these features.
+Analysis now calls Astra with ordered images and structured output. Set
+OPENAI_API_KEY in the project-root .env and restart the dev server. Account model
+access still needs verification. Voice remains **501 Not Implemented**.
 
 ## Structure
 
@@ -117,7 +118,7 @@ src/
   lib/api.ts                 Shared: validated HTTP client
 server/
   index.ts                   Person B: HTTP routing and boundary validation
-  analysis/analyze.ts        Person B: Astra integration (stub)
+  analysis/analyze.ts        Person B: Astra image analysis
   live/create-session.ts     Person B: GPT-Live handshake (stub)
   env.ts                     Server runtime bindings
 shared/

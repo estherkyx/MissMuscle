@@ -4,6 +4,7 @@ import { demoReport } from '../shared/fixtures/demo-report';
 import { analyzeClip } from './lib/api';
 import { extractFrames, loadLocalClip, waitForMedia, type LocalClip } from './features/video/media';
 import { createPlaybackController } from './features/video/playback';
+import { MuscleOverlay } from './features/video/MuscleOverlay';
 import { CoachPanel, type CoachPanelHandle } from './features/review/CoachPanel';
 import { MuscleGuide, ReferenceGuide, ReviewPanel } from './features/review/ReviewPanel';
 import { curlReference } from './features/review/curl-reference';
@@ -190,11 +191,13 @@ export default function App() {
           }} />
         </label>
         {clip ? <>
-          <div className="player"><video key={clip.id} ref={videoRef} src={clip.url} controls playsInline preload="auto" aria-label="Your local curl clip"
+          <div className="tracking-player" key={clip.id}><div className="source-view"><div className="viewer-heading"><span>01 / Original video</span><span>LOCAL CLIP</span></div><div className="player"><video key={clip.id} ref={videoRef} src={clip.url} controls playsInline preload="auto" aria-label="Your local curl clip"
             onLoadedData={() => { setReady(true); syncPlayback(true); }}
             onTimeUpdate={() => syncPlayback()} onPlay={() => syncPlayback(true)} onPause={() => syncPlayback(true)}
             onSeeking={() => syncPlayback(true)} onSeeked={() => syncPlayback(true)} onEnded={() => syncPlayback(true)}
-            onError={() => { setReady(false); setPlaybackError('This video cannot be played here. Try an H.264 MP4 export.'); }} /></div>
+            onError={() => { setReady(false); setPlaybackError('This video cannot be played here. Try an H.264 MP4 export.'); }} /></div></div>
+            <MuscleOverlay videoRef={videoRef} />
+          </div>
           <p className="clip-meta">{clip.name} · {clip.durationSec.toFixed(2)}s · {clip.width} × {clip.height}{mode === 'sample' && ' · sample playback ends at 12s'}</p>
         </> : <div className="video-placeholder"><span aria-hidden="true">↗</span><p>Your movement starts here</p><small>Choose a short clip with a clear view of your working arm and torso.</small></div>}
         <p className="muted">{curlReference.camera}</p>

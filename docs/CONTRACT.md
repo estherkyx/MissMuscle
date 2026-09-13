@@ -7,9 +7,9 @@ Both sides import the types and schemas. All HTTP paths are same-origin.
 
 | Endpoint | Input | Output | Starter behaviour |
 | --- | --- | --- | --- |
-| `GET /api/health` | None | Capability status | 200; reports analysis/voice unimplemented |
+| `GET /api/health` | None | Capability status | 200; analysis configured/not_configured, voice not_implemented |
 | `GET /api/demo-report` | None | `AnalysisReport` | 200; always `source: fixture` |
-| `POST /api/analyze` | `AnalysisRequest` JSON | `AnalysisReport` | Validates input; 501 until implemented |
+| `POST /api/analyze` | `AnalysisRequest` JSON | `AnalysisReport` | Calls Astra; 503 if key missing or access denied |
 | `POST /api/live/session` | `LiveSessionRequest` JSON | `LiveSessionResponse` | Validates input; 501 until implemented |
 
 Failure envelope: `{ "error": { "code": "INVALID_REQUEST", "message": "..." } }`.

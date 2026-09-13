@@ -44,7 +44,7 @@ export default {
     const path = new URL(request.url).pathname;
     try {
       if (path === '/api/health' && request.method === 'GET') {
-        return json({ ok: true, analysis: 'not_implemented', voice: 'not_implemented' });
+        return json({ ok: true, analysis: env.OPENAI_API_KEY?.trim() ? 'configured' : 'not_configured', voice: 'not_implemented' });
       }
       if (path === '/api/demo-report' && request.method === 'GET') return json(demoReport);
       if (path === '/api/analyze' && request.method === 'POST') {
