@@ -20,10 +20,31 @@ test('late coach setup disconnects after stop and cannot issue stale commands', 
   void session.start(input);
   assert.equal(starts, 1);
   const stop = session.stop();
+  assert.equal(saved.signal?.aborted, true, 'Stopping must cancel the actual adapter startup');
   saved.onCommand({ type: 'pause_video' });
   resolve({ disconnect: async () => { disconnects++; }, updateContext: () => assert.fail('Obsolete context must not be sent') });
   await Promise.all([start, stop]);
   assert.equal(commands, 0); assert.equal(disconnects, 1);
+});
+
+test('adapter errors reach the UI and a terminated connection permits a new start', async () => {
+  let saved!: CoachOptions;
+  let starts = 0;
+  const errors: string[] = [];
+  const session = createCoachSession(async input => {
+    saved = input; starts++;
+    return { updateContext() {}, async disconnect() {} };
+  });
+  const input = { ...options(), onError: (message: string) => errors.push(message) };
+  await session.start(input);
+  saved.onStatus('error');
+  saved.onError?.('Media connection failed');
+  assert.deepEqual(errors, ['Media connection failed']);
+  await session.start(input);
+  assert.equal(starts, 2);
+  await session.stop();
+  saved.onError?.('Stale error');
+  assert.equal(errors.length, 1);
 });
 
 test('current selection reaches a connecting session and teardown completes before restart', async () => {

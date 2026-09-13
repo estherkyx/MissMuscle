@@ -1,9 +1,36 @@
 import type { LiveSessionRequest, LiveSessionResponse } from '../../shared/contracts';
+import { z } from 'zod';
+import { buildCoachInstructions, COACH_TOOLS, LIVE_INSTRUCTIONS } from '../../shared/coach-config';
 import type { Env } from '../env';
 import { ServiceError } from '../errors';
+import { openaiPost } from '../openai';
 
-// Person B: implement the trusted-server GPT-Live WebRTC handshake.
-// This is an app contract; do not forward it unchanged to OpenAI.
-export async function createLiveSession(_request: LiveSessionRequest, _env: Env): Promise<LiveSessionResponse> {
-  throw new ServiceError(501, 'LIVE_NOT_IMPLEMENTED', 'GPT-Live voice is not connected yet.');
+const UpstreamSessionSchema = z.object({
+  session: z.object({ id: z.string().min(1).max(100) }),
+  transport: z.object({ type: z.literal('webrtc'), sdp: z.string().min(1).max(100_000) }),
+});
+
+export async function createLiveSession(request: LiveSessionRequest, env: Env): Promise<LiveSessionResponse> {
+  const raw = await openaiPost('/live/sessions', {
+    session: {
+      model: env.LIVE_MODEL || 'gpt-live-1',
+      instructions: LIVE_INSTRUCTIONS,
+      delegation: {
+        type: 'responses',
+        responses: {
+          model: env.ASTRA_MODEL || 'gpt-6-astra',
+          instructions: buildCoachInstructions(request.context),
+          tools: COACH_TOOLS,
+          tool_choice: 'auto',
+          parallel_tool_calls: false,
+          reasoning: { effort: 'low' },
+          max_output_tokens: 3000,
+        },
+      },
+    },
+    transport: { type: 'webrtc', sdp: request.sdpOffer },
+  }, env, 25_000);
+  const parsed = UpstreamSessionSchema.safeParse(raw);
+  if (!parsed.success) throw new ServiceError(502, 'INVALID_LIVE_RESPONSE', 'OpenAI returned an invalid voice-session handshake.');
+  return { sessionId: parsed.data.session.id, sdpAnswer: parsed.data.transport.sdp };
 }

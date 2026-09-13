@@ -21,8 +21,8 @@ the fixture is not an assessment of a user-supplied clip.
    cancel an obsolete extraction if the user replaces the clip.
 3. **Call `analyzeClip()` from `src/lib/api.ts`.** Generate a new `clipId` per upload.
    Show extraction, analysis, failure, and retry states. Ignore responses whose
-   `clipId` no longer matches the active clip. The endpoint returns 501 until
-   Person B connects Astra; build the layout using the fixture meanwhile.
+   `clipId` no longer matches the active clip. The endpoint now calls real Astra
+   when the server key is configured. See [Person B's handoff](PERSON_B_STATUS.md).
 4. **Show the evidence.** Selecting a correction pauses and seeks to its first
    evidence timestamp, then shows its observation and cue. Draw the normalized
    region only at the matching paused keyframe. Null region means no box. Fit

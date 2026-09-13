@@ -55,10 +55,13 @@ IDs never select a substitute. New commands, manual seeks/pauses, replacement, a
 dispose cancel pending replay. Replay checks use animation frames plus time updates;
 the player corrects overshoot to the segment end when notified by the browser.
 
-The report panel displays the exact submitted JPEG at matching paused evidence
-times (within 0.05 seconds). Regions are percentages of that image's bounds, not
-the letterboxed video container. Playing/seeking elsewhere hides the image overlay;
-null regions produce no box. The thumbnail is evidence, not continuous tracking.
+The main video is the primary review surface. Clicking a correction beneath it
+pauses, seeks to its evidence, and scrolls the player into view. At matching paused
+evidence times (within 0.05 seconds), `EvidenceOverlay.tsx` draws the approximate
+region over the video. Its SVG uses the submitted frame's dimensions and the same
+contain alignment as the player, so letterboxing is excluded. Playing/seeking
+elsewhere hides the overlay; null regions and fictional reports produce no box.
+This is a keyframe annotation, not continuous tracking.
 
 ## Sample and voice
 
@@ -90,8 +93,8 @@ node --import tsx --test src/features/video/video.test.ts src/features/review/co
 npm run check
 ```
 
-The first command is explicit because the shared `npm test` script only discovers
-root `tests/*.test.ts`. Feature tests cover limits, sampling, scaling, wait cleanup,
+The first command runs only the original feature checks; integrated `npm test`
+now includes these files as well as the root tests. Feature tests cover limits, sampling, scaling, wait cleanup,
 command rejection, click/voice parity, replay cancellation, and late voice lifecycle.
 
 Browser acceptance: upload portrait and landscape clips, inspect submitted JPEGs,
