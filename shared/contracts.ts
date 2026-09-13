@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { exerciseCriteria } from './exercise-criteria';
 
 // Shared handoff. Both people import this file; coordinate schema changes.
 export const LIMITS = {
@@ -10,8 +11,8 @@ export const LIMITS = {
   requestBytes: 6 * 1024 * 1024,
 } as const;
 
-export const ExerciseIdSchema = z.literal('dumbbell_curl');
-export const FormCriterionIdSchema = z.enum(['steady_upper_arm', 'neutral_wrist', 'steady_torso', 'relaxed_shoulders', 'controlled_movement']);
+export const ExerciseIdSchema = z.enum(['dumbbell_curl', 'lat_pulldown', 'leg_extension', 'dumbbell_front_squat']);
+export const FormCriterionIdSchema = z.enum(['steady_upper_arm', 'neutral_wrist', 'steady_torso', 'relaxed_shoulders', 'controlled_movement', 'stable_torso', 'front_pull', 'controlled_return', 'machine_alignment', 'supported_torso', 'smooth_extension', 'front_rack', 'grounded_feet', 'knee_tracking']);
 export const FormStatusSchema = z.enum(['looks_consistent', 'needs_attention', 'unclear']);
 const Seconds = z.number().finite().min(0).max(LIMITS.clipSeconds);
 const Id = z.string().min(1).max(100);
@@ -77,10 +78,11 @@ export const AnalysisReportSchema = z.object({
   targetMuscles: z.array(z.string().min(1).max(100)).min(1).max(5),
   corrections: z.array(CorrectionSchema).max(3),
   // Additive: older reports remain readable, but missing checks never imply a pass.
-  formChecks: z.array(FormCheckSchema).length(5).optional(),
+  formChecks: z.array(FormCheckSchema).min(3).max(5).optional(),
   nextAttemptFocus: z.string().min(1).max(300),
 }).superRefine((report, ctx) => {
-  if (report.formChecks && new Set(report.formChecks.map(check => check.criterionId)).size !== 5) {
+  const criteria = exerciseCriteria[report.exerciseId];
+  if (report.formChecks && (report.formChecks.length !== criteria.length || new Set(report.formChecks.map(check => check.criterionId)).size !== criteria.length || report.formChecks.some(check => !criteria.some(criterion => criterion.id === check.criterionId)))) {
     ctx.addIssue({ code: 'custom', path: ['formChecks'], message: 'Assess each form criterion exactly once.' });
   }
   for (const check of report.formChecks ?? []) {
@@ -158,3 +160,5 @@ export type CoachCommand = z.infer<typeof CoachCommandSchema>;
 export type CoachContext = z.infer<typeof CoachContextSchema>;
 export type LiveSessionRequest = z.infer<typeof LiveSessionRequestSchema>;
 export type LiveSessionResponse = z.infer<typeof LiveSessionResponseSchema>;
+
+export type ExerciseId = z.infer<typeof ExerciseIdSchema>;

@@ -1,5 +1,9 @@
 # Person B: implementation and handoff
 
+Current exercise expansion: see [multi-exercise implementation and handoff](EXERCISES.md).
+All four dropdown variations now have analysis and motion support; curl-only
+instructions below describe the original build. Real-clip acceptance is still required.
+
 Updated 13 September 2026. Working branch: `agent-integration`.
 
 ## Integration update

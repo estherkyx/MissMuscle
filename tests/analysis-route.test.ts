@@ -9,7 +9,7 @@ const input = {
 };
 const findings = () => ({
   summary: 'The upper arm shifts forward across the sampled frames.',
-  formChecks: FormCriterionIdSchema.options.map(criterionId => ({ criterionId, status: 'unclear', note: 'This cue is not clear enough to assess.', evidence: [] })),
+  formChecks: FormCriterionIdSchema.options.slice(0, 5).map(criterionId => ({ criterionId, status: 'unclear', note: 'This cue is not clear enough to assess.', evidence: [] })),
   visibility: { assessable: true, limitations: [] }, targetMuscles: ['Biceps brachii'],
   nextAttemptFocus: 'Keep the upper arm steadier.',
   corrections: [{ title: 'Upper arm movement', priority: 'focus_first', observation: 'The upper arm shifts forward.', cue: 'Keep your upper arm near your side.', referenceCue: 'Aim for a steady upper arm.', evidence: [{ frameIndex: 1, region: null as unknown }] }],

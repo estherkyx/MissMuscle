@@ -1,5 +1,9 @@
 # Person B — Astra analysis, GPT-Live, integration
 
+Current exercise expansion: see [multi-exercise implementation and handoff](EXERCISES.md).
+All four dropdown variations now have analysis and motion support; curl-only
+instructions below describe the original build. Real-clip acceptance is still required.
+
 You own `server/`, `src/features/voice/`, and the deployment work. Person A owns
 the main React interface, video extraction, and playback. Keep root package/config
 changes coordinated; you are the default integration owner.

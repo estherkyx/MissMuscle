@@ -15,7 +15,7 @@ const request = AnalysisRequestSchema.parse({
 const draft = {
   summary: 'Visible upper-arm movement during this repetition.',
   visibility: { assessable: true, limitations: [] },
-  formChecks: FormCriterionIdSchema.options.map(criterionId => ({ criterionId, status: 'unclear', note: 'This cue is not clear enough to assess.', evidence: [] as Array<{ frameIndex: number }> })),
+  formChecks: FormCriterionIdSchema.options.slice(0, 5).map(criterionId => ({ criterionId, status: 'unclear', note: 'This cue is not clear enough to assess.', evidence: [] as Array<{ frameIndex: number }> })),
   corrections: [{
     title: 'Keep the upper arm steadier', priority: 'focus_first',
     observation: 'The upper arm moves forward between these frames.',

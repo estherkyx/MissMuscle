@@ -1,5 +1,5 @@
 import type { AnalysisReport } from '../../../shared/contracts';
-import { curlReference } from '../../../shared/curl-reference';
+import { exerciseCriteria } from '../../../shared/exercise-criteria';
 import { videoFeedback } from '../../../shared/video-feedback';
 
 const statuses = {
@@ -11,7 +11,7 @@ const statuses = {
 export function FormChecklist({ report, onSeek }: { report: AnalysisReport; onSeek?: (seconds: number) => void }) {
   return <div className="form-checklist" aria-label="AI form checklist">
     <p className="checklist-label">Form check <span>Based on what’s visible</span></p>
-    {curlReference.criteria.map(criterion => {
+    {exerciseCriteria[report.exerciseId].map(criterion => {
       const check = report.visibility.assessable ? report.formChecks?.find(item => item.criterionId === criterion.id) : undefined;
       const status = check?.status ?? 'unclear';
       const display = statuses[status];

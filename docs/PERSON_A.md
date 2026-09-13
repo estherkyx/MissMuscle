@@ -1,5 +1,9 @@
 # Person A — video and visual experience
 
+Current exercise expansion: see [multi-exercise implementation and handoff](EXERCISES.md).
+All four dropdown variations now have analysis and motion support; curl-only
+instructions below describe the original build. Real-clip acceptance is still required.
+
 You own `src/App.tsx`, `src/styles.css`, `src/features/video/`,
 `src/features/review/`, and `public/`. Person B owns `src/features/voice/`.
 
