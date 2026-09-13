@@ -2,8 +2,29 @@
 
 The implementation is composed by [App](../../App.tsx), using the unchanged
 [shared contract](../../../shared/contracts.ts) and [analysis client](../../lib/api.ts).
-Person B's server and voice adapter remain separately owned. No dependencies or
-package scripts were changed.
+Person B's server and voice adapter remain separately owned. The moving muscle
+overlay adds the pinned frontend dependency `@mediapipe/tasks-vision@0.10.32`;
+the lockfile is updated. Shared contracts and package scripts are unchanged.
+
+## Synchronized body map
+
+[MuscleOverlay](MuscleOverlay.tsx) now renders a separate body-map canvas beside
+original footage. Choose **Start body mapping**, then use the original video
+controls to play, pause, or seek both views. [mapped-body.ts](mapped-body.ts)
+draws a 2D joint-driven illustration on a dark grid, with red upper-arm target
+areas, yellow supporting forearm areas, and gray other areas. The matching
+[target guide](../../../public/target-muscles.svg) uses the same color legend.
+These are fixed educational curl categories, not measured activation, intensity,
+muscle segmentation, a 3D reconstruction, or a generated/exportable video file.
+
+Inference uses the existing pinned MediaPipe dependency and downloaded WASM/model.
+Video inference stays local. Multiple people suppress the map; missing/low-visibility
+joints suppress their connected segments. Seeking and resizing clear the old pose.
+Detection runs at most about 12 times per second, so the map can lag playback on
+slower devices. Pausing retains the latest detection, and backward seeks trigger
+fresh inference. Stop mapping, replace the clip, or unmount to release the tracker.
+Native video fullscreen and picture-in-picture show only the source footage.
+No shared contract, voice interface, or dependency changes are needed for this view.
 
 ## Upload and extraction
 
@@ -108,3 +129,28 @@ for actual synthetic-video decoding/JPEG extraction, portrait/landscape scaling,
 sample isolation, stale-response rejection, evidence alignment, replay termination,
 and provider/codec failure messages. Reference SVGs load at desktop and 390 px widths.
 Synthetic test responses are confined to the local QA harness, never app fallback code.
+
+
+## Third view: reference form
+
+[ReferenceMotion](ReferenceMotion.tsx) reuses [the body-map renderer](mapped-body.ts)
+with an [authored curl pose](reference-pose.ts). It starts paused, with independent
+play/pause and scrub controls. This is an educational demonstration using the
+existing [curl rubric](../review/curl-reference.ts), not a corrected user pose.
+Shoulders, upper arms and torso stay fixed while the forearms lift and lower with
+aligned wrists. Timing is illustrative, not a prescribed cadence. The reference
+wraps below the original/body-map pair on narrow screens. No shared interfaces
+or dependencies change.
+
+## Movement-synchronized reference
+
+The third panel now consumes the same detected frame as the body map via
+[curl-sync.ts](curl-sync.ts). It follows projected elbow bend rather than a fixed
+animation clock: video pause, speed changes and seeking govern all three views.
+A visible shoulder/elbow/wrist chain is selected and retained until mapping resets.
+Missing landmarks or multiple people hide the reference, with no independent loop
+or sample fallback. Seeking resets direction history. Torso and upper-arm reference
+positions remain authored. Camera projection and partial range can affect timing;
+this is approximate phase matching, not measured anatomical speed or a prescription.
+
+
