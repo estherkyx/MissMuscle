@@ -42,3 +42,24 @@ main{max-width:1500px}.workspace{grid-template-columns:minmax(0,1.65fr) minmax(3
 .analysis-action-buttons{display:flex;gap:10px;flex-shrink:0}.analysis-action-buttons button{font-size:12px;padding:12px 14px;white-space:nowrap}.analysis-action-buttons button>span{margin-left:12px}.analysis-controls{flex-wrap:wrap}.tracking-player .muscle-overlay-controls{padding:10px 16px}.muscle-overlay-controls .heatmap-legend{margin:0}@media(max-width:720px){.reference-motion{display:block}.reference-motion .mapped-stage{aspect-ratio:3/2}}@media(max-width:560px){.analysis-controls .clip-meta{flex-basis:100%;text-align:left}.analysis-action-buttons{gap:8px}.analysis-action-buttons button{padding:12px 10px;font-size:11px}.analysis-action-buttons button>span{margin-left:6px}}
 
 .reference-anatomy:has(>svg:nth-child(2)){flex-direction:column;gap:12px}.reference-anatomy .muscle-diagram{height:auto;min-height:0;max-height:none}.reference-anatomy:has(>svg:nth-child(2))>svg{width:100%;flex-shrink:0}@media(max-width:560px){.reference-anatomy{max-height:none}.reference-anatomy .muscle-diagram{max-height:none}.reference-anatomy:has(>svg:nth-child(2)){max-height:none}}
+
+/* Two explicit workflows share the same exercise reference. */
+[hidden]{display:none!important}
+.mode-selector{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 22px}
+.mode-choice{display:grid;gap:6px;text-align:left;background:#fffefa;color:#335036;border:1px solid #d4ddc9;padding:18px 22px}
+.mode-choice:hover{background:#edf1e6}.mode-choice.selected{background:#e5eddb;border-color:#708d56;box-shadow:inset 0 0 0 1px #708d56}
+.mode-choice strong{font-size:16px}.mode-choice span{font-size:12px;font-weight:400;color:#66765d}
+.live-introduction{padding:26px;background:#edf1e6;border-radius:12px;max-width:760px;margin:16px auto}
+.live-introduction p{font-size:14px;line-height:1.7}.capture-notice{padding-top:15px;border-top:1px solid #d4ddc9}
+.live-status{display:flex;align-items:center;gap:10px;font-size:12px;margin:16px 0;color:#52684a}.live-status>span:last-child{margin-left:auto}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#789457;flex:none}
+.live-findings{padding-top:24px}.live-finding{padding:16px 20px;border:1px solid #dce2d4;border-left:3px solid #b57847;border-radius:9px;margin:10px 0;background:#fffefa}
+.live-finding.improved{border-left-color:#789457;background:#f0f4e9}.live-finding p{font-size:14px;margin:8px 0 0}.live-finding small{display:block;color:#7b8772;margin-top:8px}
+.replay-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0}.replay-controls{display:flex;align-items:center;gap:12px;margin:14px 0;font-size:12px;font-variant-numeric:tabular-nums}.replay-controls input{flex:1;min-width:40px;accent-color:#244c38}
+.review-evidence{padding:18px 0;font-size:14px}.review-evidence .evidence-actions{display:flex;flex-wrap:wrap;gap:8px}
+.session-diagnostics{margin-top:20px;color:#7b8772;font-size:11px}.session-diagnostics p{line-height:1.6}.post-session{border-top:1px solid #dce2d4;padding-top:24px}
+@media(max-width:560px){.mode-selector{gap:8px}.mode-choice{padding:14px 12px}.mode-choice strong{font-size:14px}.mode-choice span{font-size:11px}.live-introduction{padding:18px}.live-status{flex-wrap:wrap}.live-status>span:last-child{margin-left:0}.live-workspace .video-toolbar{flex-wrap:wrap}.live-workspace .video-toolbar .actions{max-width:none}.replay-controls{gap:8px}}
+
+/* Mirror only the live presentation; captured frames retain source coordinates. */
+.live-workspace .source-view video,
+.live-workspace .mapped-view canvas{transform:scaleX(-1)}

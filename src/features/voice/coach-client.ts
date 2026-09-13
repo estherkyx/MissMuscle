@@ -1,11 +1,11 @@
-import { CoachContextSchema, type CoachCommand, type CoachContext } from '../../../shared/contracts';
+import { SessionCoachContextSchema, type CoachCommand, type CoachContext, type SessionCoachContext, type LiveCoachContext, type LiveInspectionResult } from '../../../shared/contracts';
 import { buildCoachInstructions } from '../../../shared/coach-config';
 import { startLiveSession } from '../../lib/api';
 import { createLiveEventProcessor } from './live-events';
 
 // Person B owns this browser adapter as well as server/live/.
 // Person A consumes this interface without needing OpenAI event knowledge.
-export type CoachStatus = 'idle' | 'connecting' | 'listening' | 'speaking' | 'error';
+export type CoachStatus = 'idle' | 'connecting' | 'ready' | 'listening' | 'speaking' | 'error';
 export interface CoachOptions {
   context: CoachContext;
   onStatus: (status: CoachStatus) => void;
@@ -20,8 +20,30 @@ export interface CoachConnection {
   disconnect(): Promise<void>;
 }
 
-export async function connectCoach(options: CoachOptions): Promise<CoachConnection> {
-  let context = CoachContextSchema.parse(options.context);
+export interface LiveCoachOptions extends Omit<CoachOptions, 'context' | 'onCommand'> {
+  context: LiveCoachContext;
+  onInspect?(question: string): Promise<LiveInspectionResult>;
+  onInspectionBusy?(busy: boolean): void;
+  onUserActivity?(): void;
+}
+export interface LiveCoachConnection {
+  updateContext(context: LiveCoachContext): void;
+  announceCue(text: string): boolean;
+  setMuted(muted: boolean): void;
+  disconnect(): Promise<void>;
+}
+type AnyOptions = Omit<CoachOptions, 'context' | 'onCommand'> & {
+  context: SessionCoachContext; onCommand?: CoachOptions['onCommand'];
+  onInspect?: LiveCoachOptions['onInspect'];
+  onInspectionBusy?: LiveCoachOptions['onInspectionBusy'];
+  onUserActivity?: () => void;
+};
+export function connectCoach(options: CoachOptions): Promise<CoachConnection> { return connectAnyCoach(options); }
+export function connectLiveCoach(options: LiveCoachOptions): Promise<LiveCoachConnection> { return connectAnyCoach(options); }
+async function connectAnyCoach(options: AnyOptions) {
+  let context = SessionCoachContextSchema.parse(options.context);
+  const guidanceOnly = 'mode' in context && context.guidanceOnly === true;
+  const waitingStatus = guidanceOnly ? 'ready' : 'listening';
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection) {
     throw new Error('Voice requires a supported browser on HTTPS or localhost.');
   }
@@ -34,6 +56,7 @@ export async function connectCoach(options: CoachOptions): Promise<CoachConnecti
   audio.controls = true;
   audio.setAttribute('aria-label', 'Coach audio — press play if your browser blocks sound');
   let microphone: MediaStream | undefined;
+  let silentSource: ConstantSourceNode | undefined;
   let ready = false;
   let disposed = false;
   let closing = false;
@@ -41,6 +64,9 @@ export async function connectCoach(options: CoachOptions): Promise<CoachConnecti
   let sessionRequested = false;
   let closeSent = false;
   let lastContextSentAt = 0;
+  let lastUserActivity = -Infinity;
+  let inspecting = false;
+  let muted = false;
   let contextTimer: ReturnType<typeof setTimeout> | undefined;
   let connectionTimer: ReturnType<typeof setTimeout> | undefined;
   let disconnectTimer: ReturnType<typeof setTimeout> | undefined;
@@ -69,6 +95,7 @@ export async function connectCoach(options: CoachOptions): Promise<CoachConnecti
     clearTimeout(connectionTimer);
     clearTimeout(disconnectTimer);
     if (meterFrame !== undefined) cancelAnimationFrame(meterFrame);
+    silentSource?.stop(); silentSource?.disconnect();
     if (meter) void meter.close().catch(() => {});
     microphone?.getTracks().forEach(track => track.stop());
     audio.pause(); audio.srcObject = null; audio.remove();
@@ -94,14 +121,19 @@ export async function connectCoach(options: CoachOptions): Promise<CoachConnecti
   }
   const processor = createLiveEventProcessor({
     getContext: () => context,
-    onCommand: options.onCommand,
-    onTranscript: options.onTranscript,
+    onCommand: command => options.onCommand?.(command),
+    onInspect: options.onInspect,
+    onInspectionBusy: busy => { inspecting = busy; options.onInspectionBusy?.(busy); },
+    onTranscript: entry => {
+      if (entry.role === 'user') { lastUserActivity = Date.now(); options.onUserActivity?.(); }
+      options.onTranscript(entry);
+    },
     send,
     onStarted() {
       if (ready || disposed) return;
       ready = true;
       if (closing) { sendCloseWhenReady(); return; }
-      status('listening');
+      status(waitingStatus);
       resolveReady();
       pushContext();
     },
@@ -121,7 +153,7 @@ export async function connectCoach(options: CoachOptions): Promise<CoachConnecti
     clearTimeout(connectionTimer);
     clearTimeout(disconnectTimer);
     disconnectTimer = setTimeout(() => {
-      fail('Microphone disconnected, but OpenAI did not confirm session finalization. Final usage is unconfirmed.');
+      fail('Coach audio stopped, but OpenAI did not confirm session finalization. Final usage is unconfirmed.');
     }, 8000);
     send({ type: 'session.close', event_id: crypto.randomUUID() });
   }
@@ -189,7 +221,7 @@ export async function connectCoach(options: CoachOptions): Promise<CoachConnecti
         analyser.getByteTimeDomainData(samples);
         const energy = samples.reduce((total, v) => total + (v - 128) ** 2, 0) / samples.length;
         if (energy > 6) lastSound = Date.now();
-        if (ready && lastStatus !== 'error') status(Date.now() - lastSound < 250 ? 'speaking' : 'listening');
+        if (ready && lastStatus !== 'error') status(Date.now() - lastSound < 250 ? 'speaking' : waitingStatus);
         meterFrame = requestAnimationFrame(poll);
       };
       poll();
@@ -202,7 +234,18 @@ export async function connectCoach(options: CoachOptions): Promise<CoachConnecti
       meter = new AudioContext();
       void meter.resume().catch(() => {});
     }
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
+    let stream: MediaStream;
+    if (guidanceOnly) {
+      if (!meter) throw new Error('Automatic spoken coaching requires Web Audio support.');
+      // GPT-Live requires an active input audio clock for commentary delivery.
+      // Send generated silence, never microphone input or substitute coach audio.
+      const destination = meter.createMediaStreamDestination();
+      silentSource = meter.createConstantSource(); silentSource.offset.value = 0;
+      silentSource.connect(destination); silentSource.start();
+      stream = destination.stream;
+    } else {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
+    }
     if (disposed) { stream.getTracks().forEach(track => track.stop()); throw new Error('Voice connection cancelled.'); }
     microphone = stream;
     stream.getAudioTracks().forEach(track => peer.addTrack(track, stream));
@@ -231,15 +274,31 @@ export async function connectCoach(options: CoachOptions): Promise<CoachConnecti
     await started;
     clearTimeout(connectionTimer);
     return {
-      updateContext(next) {
+      updateContext(next: SessionCoachContext) {
         if (disposed || closing) return;
-        const parsed = CoachContextSchema.parse(next);
-        if (parsed.report.id !== context.report.id || parsed.report.clipId !== context.report.clipId) throw new Error('End the current voice session before changing clips or reports.');
-        const selectionChanged = parsed.selectedCorrectionId !== context.selectedCorrectionId;
+        const parsed = SessionCoachContextSchema.parse(next);
+        if (('mode' in parsed) !== ('mode' in context)) throw new Error('End voice before changing modes.');
+        let selectionChanged = false;
+        if ('mode' in parsed && 'mode' in context) {
+          if (parsed.guidanceOnly !== context.guidanceOnly) throw new Error('End voice before changing microphone mode.');
+          if (parsed.sessionId !== context.sessionId) throw new Error('End voice before changing live sessions.');
+          selectionChanged = parsed.latest?.window.windowId !== context.latest?.window.windowId;
+          if (selectionChanged && parsed.latest) send({ type: 'session.thinking.append', event_id: crypto.randomUUID(), delegation_id: null,
+            content: JSON.stringify({ capturedThroughSec: parsed.latest.window.startSec + parsed.latest.report.durationSec, summary: parsed.latest.answer }).slice(0, 1200) });
+        } else if (!('mode' in parsed) && !('mode' in context)) {
+          if (parsed.report.id !== context.report.id || parsed.report.clipId !== context.report.clipId) throw new Error('End the current voice session before changing clips or reports.');
+          selectionChanged = parsed.selectedCorrectionId !== context.selectedCorrectionId;
+        }
         context = parsed;
         if (selectionChanged || Date.now() - lastContextSentAt >= 1000) pushContext();
         else if (!contextTimer) contextTimer = setTimeout(() => { contextTimer = undefined; pushContext(); }, 1000 - (Date.now() - lastContextSentAt));
       },
+      announceCue(text: string) {
+        if (!ready || disposed || closing || muted || inspecting || lastStatus === 'speaking' || Date.now() - lastUserActivity < 5000) return false;
+        send({ type: 'session.commentary.append', event_id: crypto.randomUUID(), delegation_id: null, content: text.slice(0, 1000) });
+        return true;
+      },
+      setMuted(value: boolean) { muted = value; audio.muted = value; },
       disconnect,
     };
   } catch (error) {

@@ -6,6 +6,28 @@ The demo story: upload a short dumbbell-curl clip → inspect timestamped correc
 and a target-muscle guide → talk to the coach → say **“Wait, show me where you noticed
 that”** → the coach brings up the relevant moment and explains the evidence.
 
+## Current review modes
+
+- **Upload a video:** analyse a prerecorded curl and click timestamps to review
+  evidence. The main upload workflow has no voice or microphone controls.
+- **Live exercise:** start the camera, follow the mirrored body map, and listen to
+  automatic GPT-Live corrections as periodic Astra analysis arrives. No microphone
+  access or spoken replies are required. Mute coach silences output; End session
+  closes voice and opens silent replay.
+- **Session replay:** recent video and up to five correction clips remain in local
+  memory until reset, a new live session, or leaving the page. Recordings contain
+  video only. The recorder chooses a format the browser can both record and play.
+
+Live coaching uses `guidanceOnly: true` in the shared live context. The voice
+adapter supplies silent transport audio to keep the provider session clock moving;
+it never captures microphone audio in this mode. The development voice harness
+retains its separate conversational interface.
+
+Body-tracking assets are packaged with the app; see
+[the model asset notes](public/models/README.md). Live camera/audio acceptance
+remains distinct from automated tests; do not describe unmeasured latency or cost
+as verified.
+
 ## Start here
 
 The **video/review interface, Astra analysis service, and GPT-Live voice adapter

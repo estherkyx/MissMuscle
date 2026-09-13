@@ -1,6 +1,6 @@
 import type { LiveSessionRequest, LiveSessionResponse } from '../../shared/contracts';
 import { z } from 'zod';
-import { buildCoachInstructions, COACH_TOOLS, LIVE_INSTRUCTIONS } from '../../shared/coach-config';
+import { buildCoachInstructions, COACH_TOOLS, LIVE_INSTRUCTIONS, LIVE_EXERCISE_INSTRUCTIONS, LIVE_EXERCISE_TOOLS, AUTOMATIC_COACH_INSTRUCTIONS } from '../../shared/coach-config';
 import type { Env } from '../env';
 import { ServiceError } from '../errors';
 import { openaiPost } from '../openai';
@@ -14,13 +14,13 @@ export async function createLiveSession(request: LiveSessionRequest, env: Env): 
   const raw = await openaiPost('/live/sessions', {
     session: {
       model: env.LIVE_MODEL || 'gpt-live-1',
-      instructions: LIVE_INSTRUCTIONS,
+      instructions: 'mode' in request.context ? request.context.guidanceOnly ? AUTOMATIC_COACH_INSTRUCTIONS : LIVE_EXERCISE_INSTRUCTIONS : LIVE_INSTRUCTIONS,
       delegation: {
         type: 'responses',
         responses: {
           model: env.ASTRA_MODEL || 'gpt-6-astra',
           instructions: buildCoachInstructions(request.context),
-          tools: COACH_TOOLS,
+          tools: 'mode' in request.context ? request.context.guidanceOnly ? [] : LIVE_EXERCISE_TOOLS : COACH_TOOLS,
           tool_choice: 'auto',
           parallel_tool_calls: false,
           reasoning: { effort: 'low' },

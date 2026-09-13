@@ -143,10 +143,47 @@ export const CoachContextSchema = z.object({
   }
 });
 
+// Live sessions have an unbounded session clock; each submitted window still uses
+// the existing bounded clip clock. Never use session time as a frame index.
+export const LiveWindowSchema = z.object({
+  sessionId: Id,
+  windowId: Id,
+  startSec: z.number().finite().nonnegative(),
+  request: AnalysisRequestSchema,
+}).refine(value => value.windowId === value.request.clipId, 'Window and clip IDs must match.');
+export const InspectionQuestionSchema = z.object({ question: z.string().trim().min(1).max(500) });
+export const LiveInspectionRequestSchema = z.object({ window: LiveWindowSchema, focus: InspectionQuestionSchema.optional() });
+export const LiveInspectionResultSchema = z.object({
+  window: z.object({ sessionId: Id, windowId: Id, startSec: z.number().finite().nonnegative() }),
+  report: AnalysisReportSchema,
+  answer: z.string().min(1).max(600),
+}).refine(value => value.window.windowId === value.report.clipId, 'Report belongs to another window.');
+export const LiveCoachContextSchema = z.object({
+  mode: z.literal('live'),
+  guidanceOnly: z.boolean().optional(),
+  sessionId: Id,
+  exerciseId: ExerciseIdSchema,
+  elapsedSec: z.number().finite().nonnegative(),
+  latest: LiveInspectionResultSchema.nullable(),
+}).refine(value => !value.latest || (value.latest.window.sessionId === value.sessionId &&
+  value.latest.window.startSec + value.latest.report.durationSec <= value.elapsedSec + 0.1), 'Findings must belong to the current session and its past.');
+export const SessionCoachContextSchema = z.union([CoachContextSchema, LiveCoachContextSchema]);
+export const RetainedEvidenceSchema = z.object({
+  windowId: Id, criterionId: FormCriterionIdSchema,
+  frameIndex: z.number().int().min(0).max(LIMITS.maxFrames - 1),
+  timestampSec: Seconds,
+});
+export type LiveWindow = z.infer<typeof LiveWindowSchema>;
+export type LiveInspectionRequest = z.infer<typeof LiveInspectionRequestSchema>;
+export type LiveInspectionResult = z.infer<typeof LiveInspectionResultSchema>;
+export type LiveCoachContext = z.infer<typeof LiveCoachContextSchema>;
+export type SessionCoachContext = z.infer<typeof SessionCoachContextSchema>;
+export type RetainedEvidence = z.infer<typeof RetainedEvidenceSchema>;
+
 // App-owned handshake, not the upstream OpenAI session schema.
 export const LiveSessionRequestSchema = z.object({
   sdpOffer: z.string().min(1).max(100_000),
-  context: CoachContextSchema,
+  context: SessionCoachContextSchema,
 });
 export const LiveSessionResponseSchema = z.object({ sessionId: Id, sdpAnswer: z.string().min(1).max(100_000) });
 export const ApiErrorSchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) });

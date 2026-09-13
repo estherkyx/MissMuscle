@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test, type TestContext } from 'node:test';
-import { connectCoach, type CoachOptions } from '../src/features/voice/coach-client';
+import { connectCoach, connectLiveCoach, type CoachOptions } from '../src/features/voice/coach-client';
 import { demoReport } from '../shared/fixtures/demo-report';
 
 function browser(t: TestContext) {
@@ -110,4 +110,54 @@ test('denied microphone permission releases the transport without a provider req
   assert.equal(fetch.mock.callCount(), 0);
   assert.equal(app.peer.connectionState, 'closed');
   assert.equal(app.statuses.at(-1), 'error');
+});
+
+
+test('live coach starts before a report, updates findings without reconnecting, and mutes cues', async t => {
+  const app = browser(t);
+  const fetch = t.mock.method(globalThis, 'fetch', async () => answer());
+  const context = { mode: 'live' as const, sessionId: 'exercise-session', exerciseId: 'dumbbell_curl' as const, elapsedSec: 0, latest: null };
+  const connecting = connectLiveCoach({ ...app.options, context, onInspect: async () => { throw new Error('No frames yet'); } });
+  await tick(); app.channel.receive('session.started'); const connection = await connecting;
+  connection.updateContext({ ...context, elapsedSec: 100 });
+  assert.equal(fetch.mock.callCount(), 1);
+  assert.equal(connection.announceCue('Test-only cue'), true);
+  connection.setMuted(true); assert.equal(connection.announceCue('Must remain silent'), false);
+  assert.throws(() => connection.updateContext({ ...context, sessionId: 'another' }), /End voice/);
+  const closing = connection.disconnect(); app.channel.receive('session.closed'); await closing;
+  assert.equal(app.track.stopped, true);
+});
+
+
+test('automatic coaching uses a silent transport and never requests the microphone', async t => {
+  const app = browser(t);
+  const media = t.mock.method(app.navigator.mediaDevices, 'getUserMedia', async () => { throw new Error('Microphone must not be requested'); });
+  const silentTrack = { enabled: true, stopped: false, stop() { this.stopped = true; } };
+  const source = { offset: { value: 1 }, stopped: false, started: false, connect() {}, disconnect() {}, start() { this.started = true; }, stop() { this.stopped = true; } };
+  let closed = false;
+  class Context {
+    async resume() {}
+    async close() { closed = true; }
+    createMediaStreamDestination() { return { stream: { getTracks: () => [silentTrack], getAudioTracks: () => [silentTrack] } }; }
+    createConstantSource() { return source; }
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'AudioContext');
+  Object.defineProperty(globalThis, 'AudioContext', { configurable: true, value: Context });
+  Object.assign(window, { AudioContext: Context });
+  t.after(() => { if (descriptor) Object.defineProperty(globalThis, 'AudioContext', descriptor); else Reflect.deleteProperty(globalThis, 'AudioContext'); });
+  t.mock.method(globalThis, 'fetch', async (_input: unknown, init: RequestInit) => {
+    assert.equal(JSON.parse(init.body as string).context.guidanceOnly, true);
+    return answer();
+  });
+  const context = { mode: 'live' as const, guidanceOnly: true, sessionId: 'automatic-session', exerciseId: 'dumbbell_curl' as const, elapsedSec: 0, latest: null };
+  const connecting = connectLiveCoach({ context, onStatus: status => app.statuses.push(status), onTranscript() {} });
+  await tick(); app.channel.receive('session.started'); const connection = await connecting;
+  assert.equal(media.mock.callCount(), 0);
+  assert.equal(source.offset.value, 0); assert.equal(source.started, true);
+  assert.equal(app.statuses.at(-1), 'ready');
+  assert.equal(connection.announceCue('Keep your wrists aligned.'), true);
+  assert.equal(app.channel.sent.at(-1)?.type, 'session.commentary.append');
+  connection.setMuted(true); assert.equal(connection.announceCue('Muted correction'), false);
+  const closing = connection.disconnect(); app.channel.receive('session.closed'); await closing;
+  assert.equal(silentTrack.stopped, true); assert.equal(source.stopped, true); assert.equal(closed, true);
 });

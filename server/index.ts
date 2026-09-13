@@ -1,5 +1,5 @@
 import { ZodError } from 'zod';
-import { AnalysisRequestSchema, LiveSessionRequestSchema, LiveSessionResponseSchema, LIMITS, validateReportForRequest } from '../shared/contracts';
+import { LiveInspectionRequestSchema, LiveInspectionResultSchema, AnalysisRequestSchema, LiveSessionRequestSchema, LiveSessionResponseSchema, LIMITS, validateReportForRequest } from '../shared/contracts';
 import { demoReport } from '../shared/fixtures/demo-report';
 import { analyzeClip } from './analysis/analyze';
 import { createLiveSession } from './live/create-session';
@@ -53,6 +53,12 @@ export default {
         const output = await analyzeClip(input, env);
         try { return json(validateReportForRequest(output, input)); }
         catch { throw new ServiceError(502, 'INVALID_MODEL_OUTPUT', 'The analysis did not match the clip. Please retry.'); }
+      }
+      if (path === '/api/live/analyze' && request.method === 'POST') {
+        const input = LiveInspectionRequestSchema.parse(await readJson(request));
+        const report = await analyzeClip(input.window.request, env, { question: input.focus?.question, signal: request.signal });
+        const { sessionId, windowId, startSec } = input.window;
+        return json(LiveInspectionResultSchema.parse({ window: { sessionId, windowId, startSec }, report, answer: report.summary }));
       }
       if (path === '/api/live/session' && request.method === 'POST') {
         const input = LiveSessionRequestSchema.parse(await readJson(request));

@@ -86,3 +86,17 @@ the adapter. Handle a connection finishing after its component has unmounted.
 > that supports “show me where you noticed that”. Person B owns server/ and
 > src/features/voice/. Coordinate changes to shared contracts and package files.
 > Finish by running the relevant checks and reporting the handoff interface.
+
+## Automatic live coaching and replay handoff
+
+The main interface has separate upload and live modes. Upload review keeps
+timestamp seeking and does not mount voice controls. Live mode uses automatic
+spoken guidance with `guidanceOnly: true`; its UI must not ask the user to speak
+or request microphone access. Person B owns the silent voice transport.
+
+Replay object URLs are allocated and released together inside the React effect
+in `SessionReplay`, through `createReplayResources`. Do not allocate these URLs
+in render or `useMemo`: Strict Mode cleanup would revoke URLs reused by the next
+effect setup. The recorder selects a jointly recordable/playable MIME type and
+retains the actual recorder MIME type. Keep recorded frames and evidence offsets
+in source orientation; only live camera/body-map presentation is mirrored.

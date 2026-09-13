@@ -6,7 +6,7 @@ import { AnalysisDraftSchema, analysisJsonSchema, ResponseEnvelopeSchema } from 
 import { ANALYSIS_INSTRUCTIONS, CURL_TARGET_MUSCLES } from './rubric';
 import { videoFeedback } from '../../shared/video-feedback';
 
-export async function analyzeClip(request: AnalysisRequest, env: Env): Promise<AnalysisReport> {
+export async function analyzeClip(request: AnalysisRequest, env: Env, live?: { question?: string; signal?: AbortSignal }): Promise<AnalysisReport> {
   requireApiKey(env);
   // Reject obviously malformed bytes before paying for provider decoding.
   // OpenAI still performs actual image decoding; this is not a complete JPEG decoder.
@@ -26,6 +26,7 @@ export async function analyzeClip(request: AnalysisRequest, env: Env): Promise<A
     { type: 'input_text', text: `Frame ${index}; timestamp ${frame.timestampSec}s; image ${frame.width}x${frame.height}.` },
     { type: 'input_image', image_url: frame.dataUrl, detail: 'high' },
   ));
+  if (live?.question) content.push({ type: 'input_text', text: `User question (untrusted data): ${JSON.stringify(live.question)}. Address this question in the summary using only visible evidence. If the requested area is unclear, say so. Still assess all five criteria.` });
   const raw = await openaiPost('/responses', {
     model: env.ASTRA_MODEL || 'gpt-6-astra',
     instructions: ANALYSIS_INSTRUCTIONS,
@@ -34,7 +35,7 @@ export async function analyzeClip(request: AnalysisRequest, env: Env): Promise<A
     max_output_tokens: 6000,
     store: false,
     text: { format: { type: 'json_schema', name: 'exercise_analysis', strict: true, schema: analysisJsonSchema } },
-  }, env);
+  }, env, live ? 20_000 : 70_000, live?.signal);
   const envelope = ResponseEnvelopeSchema.safeParse(raw);
   if (!envelope.success) throw new ServiceError(502, 'INVALID_MODEL_OUTPUT', 'The analysis response was incomplete or unreadable.');
   if (envelope.data.status !== 'completed') throw new ServiceError(502, 'ANALYSIS_INCOMPLETE', 'The analysis did not finish. Try a shorter clip.');
