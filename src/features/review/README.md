@@ -1,7 +1,7 @@
 # Person A: sourced curl comparison and review
 
 [ReviewPanel](ReviewPanel.tsx) consumes `AnalysisReport` directly and displays
-timestamped corrections, exact submitted-frame evidence, reference guidance,
+timestamped corrections linked to the main video, reference guidance,
 visibility limitations, and next-attempt focus. Unassessable reports and assessable
 reports with zero corrections have distinct empty states. Fixture findings stay
 explicit and separate from analysis of uploaded footage.

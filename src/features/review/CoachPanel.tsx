@@ -68,18 +68,12 @@ export function CoachPanel({ ref, context, onCommand }: Props) {
     } finally { if (mounted.current && generation === uiEpoch.current) setBusy(false); }
   }
 
-  return <section className="coach-panel" aria-labelledby="coach-title">
-    <div className="section-heading"><h3 id="coach-title">Talk it through</h3><span className="status" role="status">{busy && status !== 'connecting' ? 'Ending…' : status}</span></div>
-    <p className="muted">Ask “Show me where you noticed that.” The coach uses your current report and playback position.</p>
-    {context?.report.source === 'fixture' && <p className="sample-badge">Voice discussion would use fictional sample findings.</p>}
-    <div className="actions">
-      <button onClick={() => void start()} disabled={!context || busy || active}>Start voice coach</button>
-      <button className="secondary" onClick={() => { void stop().catch(() => {}); }} disabled={!active && status !== 'connecting'}>End session</button>
+  return <section className="coach-panel" aria-label="Voice coach">
+    <div className="coach-controls"><span className="voice-indicator" aria-hidden="true">◖◗</span><div className="voice-label"><strong>Talk to your coach</strong><span role="status">{busy && status !== 'connecting' ? 'Ending…' : status === 'idle' ? context ? 'Ask “Show me where”' : 'Ready after analysis' : status}</span></div>
+      {active || status === 'connecting' ? <button className="secondary small-button" onClick={() => { void stop().catch(() => {}); }} disabled={busy && status !== 'connecting'}>End voice</button> : <button className="secondary small-button" onClick={() => void start()} disabled={!context || busy}>Start voice</button>}
     </div>
-    {!context && <p className="muted">Load a clip and a report to start voice coaching.</p>}
+    {context?.report.source === 'fixture' && <span className="sample-badge">Voice uses fictional sample findings</span>}
     {error && <p role="alert" className="error">{error}</p>}
-    <div className="transcript" role="log" aria-label="Coach conversation" aria-live="polite">
-      {transcript.map((entry, index) => <p key={index}><strong>{entry.role === 'user' ? 'You' : 'Coach'}:</strong> {entry.text}</p>)}
-    </div>
+    {!!transcript.length && <details className="conversation"><summary>Conversation</summary><div className="transcript" role="log" aria-label="Coach conversation" aria-live="polite">{transcript.map((entry, index) => <p key={index}><strong>{entry.role === 'user' ? 'You' : 'Coach'}:</strong> {entry.text}</p>)}</div></details>}
   </section>;
 }

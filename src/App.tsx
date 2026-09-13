@@ -7,12 +7,16 @@ import { createPlaybackController } from './features/video/playback';
 import { CoachPanel, type CoachPanelHandle } from './features/review/CoachPanel';
 import { MuscleGuide, ReferenceGuide, ReviewPanel } from './features/review/ReviewPanel';
 import { curlReference } from './features/review/curl-reference';
+import { EvidenceOverlay } from './features/video/EvidenceOverlay';
 
 type Mode = 'analysis' | 'sample';
 type Phase = 'idle' | 'loading' | 'ready' | 'extracting' | 'analyzing' | 'complete' | 'error';
 const messageOf = (error: unknown) => error instanceof Error ? error.message : 'Something went wrong. Please try again.';
 
 export default function App() {
+  const [exercise, setExercise] = useState('');
+  const [targetMuscle, setTargetMuscle] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<Mode>('analysis');
   const [clip, setClip] = useState<LocalClip | null>(null);
   const [report, setReport] = useState<AnalysisReport | null>(null);
@@ -88,6 +92,7 @@ export default function App() {
     activeClip.current = null;
     setClip(null); setReady(false); setRequest(null); setSelection(null);
     setPlayback({ time: 0, paused: true, seeking: false });
+    if (nextMode === 'sample') { setExercise('dumbbell_curl'); setTargetMuscle('biceps'); }
     setMode(nextMode); setReport(nextMode === 'sample' ? demoReport : null);
     setProgress(0); setPhase('idle');
     return current;
@@ -148,6 +153,11 @@ export default function App() {
     setPlaybackError('');
     if (!ready || !playbackRef.current) { setPlaybackError('Load a playable clip before using playback commands.'); return; }
     playbackRef.current.handleCoachCommand(command);
+    if (command.type !== 'pause_video') revealVideo();
+  }
+
+  function revealVideo() {
+    document.getElementById('movement-video')?.scrollIntoView({ block: 'nearest', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
   }
 
   function showCorrection(id: string) {
@@ -160,6 +170,7 @@ export default function App() {
     setPlaybackError('');
     if (!ready) { setPlaybackError('Wait for the video to finish loading.'); return; }
     playbackRef.current?.showEvidence(id, index);
+    revealVideo();
   }
 
   const correction = report?.corrections.find(item => item.id === selection?.id);
@@ -172,56 +183,55 @@ export default function App() {
   }, [report, clip, ready, playback.time, playback.paused, playback.seeking, correction?.id]);
   const working = phase === 'loading' || phase === 'extracting' || phase === 'analyzing';
 
+  const configured = exercise === 'dumbbell_curl' && targetMuscle === 'biceps';
+  const progressText = phase === 'loading' ? 'Preparing video…' : phase === 'extracting' ? `Preparing frames · ${progress}/${LIMITS.maxFrames}` : phase === 'analyzing' ? 'Reviewing your form…' : '';
+
   return <main>
-    <header><a className="brand" href="/">MissMuscle<span>✳</span></a><span className="tag">Your movement, understood.</span></header>
-    <section className="intro"><p className="eyebrow">A little guidance. A stronger next rep.</p><h1>See your form.<br /><em>Find your focus.</em></h1><p>Review a standing dumbbell curl, explore the evidence, and talk through your next rep.</p></section>
-    <div className="mode-switch" aria-label="Review mode">
-      <button className={mode === 'analysis' ? '' : 'secondary'} aria-pressed={mode === 'analysis'} onClick={() => { if (mode !== 'analysis') void reset('analysis'); }}>Review my clip</button>
-      <button className={mode === 'sample' ? '' : 'secondary'} aria-pressed={mode === 'sample'} onClick={() => { if (mode !== 'sample') void reset('sample'); }}>Explore a sample report</button>
-    </div>
-    {mode === 'sample' && <p className="sample-banner">Fictional sample findings — not an assessment of this clip. A local video can demonstrate the first 12 seconds of playback; it is not sent for analysis.</p>}
-    <div className="workspace">
-      <section className="panel">
-        <p className="eyebrow">01 / Your movement</p><h2>Standing dumbbell curl</h2>
-        <p className="muted">Palms-up curl · one clip · up to 15 seconds / 40 MiB</p>
-        <label className="file-picker">{mode === 'sample' ? 'Choose a local sample clip (12–15 seconds)' : 'Choose your curl clip'}
-          <input key={mode} type="file" accept="video/*,.mp4,.mov,.webm,.m4v" onChange={event => {
-            const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void chooseFile(file, mode);
-          }} />
-        </label>
-        {clip ? <>
-          <div className="player"><video key={clip.id} ref={videoRef} src={clip.url} controls playsInline preload="auto" aria-label="Your local curl clip"
-            onLoadedData={() => { setReady(true); syncPlayback(true); }}
-            onTimeUpdate={() => syncPlayback()} onPlay={() => syncPlayback(true)} onPause={() => syncPlayback(true)}
-            onSeeking={() => syncPlayback(true)} onSeeked={() => syncPlayback(true)} onEnded={() => syncPlayback(true)}
-            onError={() => { setReady(false); setPlaybackError('This video cannot be played here. Try an H.264 MP4 export.'); }} /></div>
-          <p className="clip-meta">{clip.name} · {clip.durationSec.toFixed(2)}s · {clip.width} × {clip.height}{mode === 'sample' && ' · sample playback ends at 12s'}</p>
-        </> : <div className="video-placeholder"><span aria-hidden="true">↗</span><p>Your movement starts here</p><small>Choose a short clip with a clear view of your working arm and torso.</small></div>}
-        <p className="muted">{curlReference.camera}</p>
-        {mode === 'analysis' && <>
-          <p className="privacy-note">Your original video stays in this browser. Only selected images are sent when you choose Analyze clip.</p>
-          <button onClick={() => void analyze()} disabled={!clip || !ready || working}>{phase === 'error' && clip ? 'Retry analysis' : 'Analyze clip'}</button>
-        </>}
-        <p role="status" className="muted">{phase === 'loading' ? 'Preparing your clip…' : phase === 'extracting' ? `Extracting frames · ${progress}/${LIMITS.maxFrames}` : phase === 'analyzing' ? 'Analyzing selected frames…' : phase === 'complete' ? 'Your report is ready.' : ''}</p>
-        {phase === 'extracting' && <progress value={progress} max={LIMITS.maxFrames} aria-label="Frame extraction progress" />}
-        {error && <p className="error" role="alert">{error}</p>}
-        {playbackError && <p className="error" role="alert">{playbackError}</p>}
-        {import.meta.env.DEV && <details className="simulator"><summary>Development playback simulator · not GPT-Live</summary>
-          <p className="muted">Send app commands without voice. Sample commands do not validate the fictional findings.</p>
-          <div className="actions">{report?.corrections.map(item => <button key={item.id} className="secondary" disabled={!ready} onClick={() => handleCoachCommand({ type: 'show_correction', correctionId: item.id })}>Show: {item.title}</button>)}
-            <button className="secondary" disabled={!ready} onClick={() => handleCoachCommand({ type: 'seek_video', timestampSec: 0 })}>Seek to start</button>
-            <button className="secondary" disabled={!ready} onClick={() => handleCoachCommand({ type: 'pause_video' })}>Pause</button>
-            <button className="secondary" disabled={!ready} onClick={() => handleCoachCommand({ type: 'replay_segment', startSec: 0, endSec: Math.min(3, report?.durationSec ?? clip?.durationSec ?? 0) })}>Replay first 3s (or full shorter clip)</button>
-          </div>
-        </details>}
-        <ReferenceGuide />
-      </section>
-      <div className="panel review-column">
-        {report ? <ReviewPanel report={report} correction={correction} evidenceIndex={selection?.index ?? 0} request={request} showKeyframe={showKeyframe} hasVideo={!!clip} onCorrection={showCorrection} onEvidence={showEvidence} /> : <section><p className="eyebrow">02 / Your next rep</p><h2>Make one thing clearer.</h2><p className="muted">Analyze your clip to compare visible movement with the basic curl guidance. You can also explore a clearly labelled sample report.</p><p className="muted">Only sampled moments can be reviewed. A hidden wrist or unclear movement should remain unassessed.</p></section>}
-        <CoachPanel key={`${mode}:${clip?.id ?? 'none'}:${report?.id ?? 'none'}`} ref={coachRef} context={context} onCommand={handleCoachCommand} />
-        <MuscleGuide />
+    <header><a className="brand" href="/">MissMuscle<span>✳</span></a><span className="tag">A little guidance. A stronger next rep.</span><a className="reference-link" href="#reference-sheet">Reference sheet ↗</a></header>
+    <section className="intro"><p className="eyebrow">Your personal form coach</p><h1>Make your next rep <em>better.</em></h1></section>
+    <section className="exercise-setup" aria-label="Choose your exercise and focus">
+      <label><span className="field-label">01 / Exercise</span><select value={exercise} disabled={working} onChange={event => { setExercise(event.target.value); setTargetMuscle(''); void reset('analysis'); }}>
+        <option value="" disabled>Choose an exercise</option><option value="dumbbell_curl">Dumbbell curl</option><option disabled>Shoulder press · coming soon</option><option disabled>Squat · coming soon</option>
+      </select></label>
+      <label><span className="field-label">02 / Primary muscle</span><select value={targetMuscle} disabled={!exercise || working} onChange={event => { setTargetMuscle(event.target.value); void reset('analysis'); }}>
+        <option value="" disabled>Choose your focus</option><option value="biceps">Biceps</option><option disabled>Brachialis · hammer curl coming soon</option>
+      </select></label>
+      <div className="variation-note"><span className="field-label">Your variation</span><span>{configured ? 'Standing · palms-up curl' : 'Select your exercise & focus'}</span><small>{configured ? 'Biceps focus' : 'More exercises on the way'}</small></div>
+    </section>
+    <section className="video-workspace" id="movement-video" aria-labelledby="video-title">
+      <div className="video-toolbar"><div><span className="eyebrow">Your movement</span><h2 id="video-title">{clip ? 'Let’s look at your form.' : 'Start with a short clip.'}</h2></div>
+        <div className="actions">{clip && <button className="secondary small-button" disabled={working} onClick={() => fileInputRef.current?.click()}>Replace video</button>}
+        <button className="text-button" aria-pressed={mode === 'sample'} disabled={working} onClick={() => void reset(mode === 'sample' ? 'analysis' : 'sample')}>{mode === 'sample' ? 'Exit sample' : 'Try a sample report ↗'}</button></div>
       </div>
-    </div>
-    <footer>MissMuscle · Visual Understanding + GPT-Live-1 · Educational form guidance</footer>
+      {mode === 'sample' && <p className="sample-banner">Fictional sample findings — not an assessment of your clip. Add a 12–15s video to try playback.</p>}
+      <input ref={fileInputRef} className="visually-hidden" type="file" accept="video/*,.mp4,.mov,.webm,.m4v" disabled={!configured || working} aria-label="Choose exercise video" onChange={event => {
+        const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void chooseFile(file, mode);
+      }} />
+      {clip ? <div className="player"><video key={clip.id} ref={videoRef} src={clip.url} controls playsInline preload="auto" aria-label="Your local curl clip"
+        onLoadedData={() => { setReady(true); syncPlayback(true); }}
+        onTimeUpdate={() => syncPlayback()} onPlay={() => syncPlayback(true)} onPause={() => syncPlayback(true)}
+        onSeeking={() => syncPlayback(true)} onSeeked={() => syncPlayback(true)} onEnded={() => syncPlayback(true)}
+        onError={() => { setReady(false); setPlaybackError('This video cannot be played here. Try an H.264 MP4 export.'); }} />
+        <EvidenceOverlay report={report} request={request} correction={correction} evidenceIndex={selection?.index ?? 0} visible={showKeyframe} />
+        {showKeyframe && correction && <div className="frame-label">{mode === 'sample' ? 'Sample moment' : 'Evidence'} · {evidence!.timestampSec.toFixed(2)}s <span>{correction.title}</span></div>}
+      </div> : <div className="video-placeholder">
+        <div className="upload-symbol" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><path d="M20 27V9m-7 7 7-7 7 7M9 27v5h22v-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></div>
+        <h3>Your next rep starts here.</h3><p>{configured ? 'Keep your working arm and torso in view.' : 'Choose an exercise and muscle above.'}</p>
+        <button disabled={!configured || working} onClick={() => fileInputRef.current?.click()}>Upload video <span aria-hidden="true">↗</span></button><small>{mode === 'sample' ? '12–15 seconds' : 'Up to 15 seconds'} · max 40 MiB</small>
+      </div>}
+      <div className="video-bottom"><div className="analysis-controls">
+        {mode === 'analysis' && <button disabled={!clip || !ready || working || !configured} onClick={() => void analyze()}>{phase === 'analyzing' || phase === 'extracting' ? 'Analyzing…' : report ? 'Analyze again' : 'Analyze clip'} <span aria-hidden="true">↗</span></button>}
+        <span className="clip-meta">{clip ? `${clip.name} · ${clip.durationSec.toFixed(1)}s` : 'Your video stays on your device.'}</span>
+      </div><CoachPanel key={`${mode}:${clip?.id ?? 'none'}:${report?.id ?? 'none'}`} ref={coachRef} context={context} onCommand={handleCoachCommand} /></div>
+      {progressText && <p role="status" className="progress-status">{progressText}</p>}
+      {phase === 'extracting' && <progress value={progress} max={LIMITS.maxFrames} aria-label="Frame extraction progress" />}
+      {error && <p className="error" role="alert">{error}</p>}{playbackError && <p className="error" role="alert">{playbackError}</p>}
+      <details className="recording-tips"><summary>Recording tips & privacy</summary><p>{curlReference.camera}</p><p>Only selected images are sent for analysis when you choose Analyze clip. Your original video stays in this browser.</p></details>
+    </section>
+    <section className="corrections-section" aria-label="Video corrections">
+      {report ? <ReviewPanel report={report} correction={correction} evidenceIndex={selection?.index ?? 0} showKeyframe={showKeyframe} hasVideo={!!clip} onCorrection={showCorrection} onEvidence={showEvidence} /> : <div className="corrections-empty"><div><p className="eyebrow">Your next rep</p><h2>Small adjustments. Better movement.</h2></div><p>Your corrections will appear here.<br />Tap one to jump to that moment.</p></div>}
+    </section>
+    <section id="reference-sheet" className="reference-sheet" aria-labelledby="reference-sheet-title"><div className="reference-heading"><div><p className="eyebrow">Keep this handy</p><h2 id="reference-sheet-title">Your reference sheet</h2></div><span className="reference-pill">Standing curl / Biceps</span></div><div className="reference-grid"><ReferenceGuide /><MuscleGuide /></div></section>
+    <footer><span>MissMuscle ✳</span><span>Educational form guidance</span></footer>
   </main>;
 }

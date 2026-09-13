@@ -12,6 +12,11 @@ The **video/review interface, Astra analysis service, and GPT-Live voice adapter
 are integrated locally**. Real exercise-flow acceptance and Sites deployment remain.
 See [current verification and next steps](docs/PERSON_B_STATUS.md).
 
+The interface starts with exercise and primary-muscle selectors. Only the standing
+palms-up dumbbell curl with biceps focus is enabled in this prototype. Video is the
+main review surface; correction rows below it seek to evidence, compact voice
+controls sit beside the video actions, and form/muscle references live at the bottom.
+
 ```sh
 npm ci
 npm run dev
