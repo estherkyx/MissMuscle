@@ -13,7 +13,7 @@ test('reference-only exercises cannot enter the curl analysis flow', () => {
 test('each new exercise renders its own form reference and source, with no curl illustration', () => {
   for (const exercise of EXERCISES.filter(item => !item.analysisAvailable)) {
     const html = renderToStaticMarkup(createElement(ReferenceGuide, { exercise }));
-    assert.ok(html.includes(exercise.label));
+    assert.ok(html.includes(exercise.variation));
     assert.ok(html.includes(exercise.sources[0].url));
     assert.match(html, /MOVEMENT REFERENCE/);
     assert.doesNotMatch(html, /curl-reference.svg/);

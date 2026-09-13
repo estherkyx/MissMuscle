@@ -86,7 +86,7 @@ export async function loadLocalClip(file: File, signal: AbortSignal): Promise<Lo
 export function validatePayload(request: AnalysisRequest) {
   const parsed = AnalysisRequestSchema.parse(request);
   if (new TextEncoder().encode(JSON.stringify(parsed)).byteLength > LIMITS.requestBytes) {
-    throw new Error('The extracted images exceed the request limit. Try a lower-resolution clip.');
+    throw new Error('This video is too large to prepare for analysis. Try a lower-resolution clip.');
   }
   return parsed;
 }
@@ -95,7 +95,7 @@ export async function extractFrames(clip: LocalClip, signal: AbortSignal, onProg
   const video = createVideo();
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
-  if (!context) throw new Error('This browser cannot prepare video frames.');
+  if (!context) throw new Error('This browser cannot prepare the video for analysis.');
   const frames: AnalysisRequest['frames'] = [];
   try {
     await waitForMedia(video, 'loadeddata', signal, () => { video.src = clip.url; video.load(); });
@@ -121,7 +121,7 @@ export async function extractFrames(clip: LocalClip, signal: AbortSignal, onProg
         if (dataUrl.length <= LIMITS.frameDataUrlChars) break;
         edge = Math.floor(edge * 0.75);
       }
-      if (dataUrl.length > LIMITS.frameDataUrlChars) throw new Error('A frame could not be compressed within the image limit.');
+      if (dataUrl.length > LIMITS.frameDataUrlChars) throw new Error('This video could not be prepared for analysis. Try a lower-resolution export.');
       frames.push({ timestampSec: video.currentTime, dataUrl, width: canvas.width, height: canvas.height });
       onProgress(frames.length);
     }

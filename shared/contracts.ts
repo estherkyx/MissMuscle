@@ -11,6 +11,8 @@ export const LIMITS = {
 } as const;
 
 export const ExerciseIdSchema = z.literal('dumbbell_curl');
+export const FormCriterionIdSchema = z.enum(['steady_upper_arm', 'neutral_wrist', 'steady_torso', 'relaxed_shoulders', 'controlled_movement']);
+export const FormStatusSchema = z.enum(['looks_consistent', 'needs_attention', 'unclear']);
 const Seconds = z.number().finite().min(0).max(LIMITS.clipSeconds);
 const Id = z.string().min(1).max(100);
 
@@ -56,6 +58,13 @@ export const CorrectionSchema = z.object({
   })).min(1).max(4),
 });
 
+export const FormCheckSchema = z.object({
+  criterionId: FormCriterionIdSchema,
+  status: FormStatusSchema,
+  note: z.string().min(1).max(250),
+  evidence: z.array(z.object({ frameIndex: z.number().int().min(0).max(LIMITS.maxFrames - 1), timestampSec: Seconds })).max(4),
+});
+
 export const AnalysisReportSchema = z.object({
   schemaVersion: z.literal('1'),
   id: Id,
@@ -67,8 +76,22 @@ export const AnalysisReportSchema = z.object({
   visibility: z.object({ assessable: z.boolean(), limitations: z.array(z.string().min(1).max(300)).max(6) }),
   targetMuscles: z.array(z.string().min(1).max(100)).min(1).max(5),
   corrections: z.array(CorrectionSchema).max(3),
+  // Additive: older reports remain readable, but missing checks never imply a pass.
+  formChecks: z.array(FormCheckSchema).length(5).optional(),
   nextAttemptFocus: z.string().min(1).max(300),
 }).superRefine((report, ctx) => {
+  if (report.formChecks && new Set(report.formChecks.map(check => check.criterionId)).size !== 5) {
+    ctx.addIssue({ code: 'custom', path: ['formChecks'], message: 'Assess each form criterion exactly once.' });
+  }
+  for (const check of report.formChecks ?? []) {
+    const minimum = check.status === 'unclear' ? 0 : check.criterionId === 'neutral_wrist' ? 1 : 2;
+    if ((!report.visibility.assessable && check.status !== 'unclear') || new Set(check.evidence.map(e => e.frameIndex)).size < minimum) {
+      ctx.addIssue({ code: 'custom', path: ['formChecks'], message: 'An assessed result requires visible supporting evidence.' });
+    }
+    if (check.evidence.some(e => e.timestampSec > report.durationSec)) {
+      ctx.addIssue({ code: 'custom', path: ['formChecks'], message: 'Checklist evidence must be inside the clip.' });
+    }
+  }
   if (new Set(report.corrections.map(c => c.id)).size !== report.corrections.length) {
     ctx.addIssue({ code: 'custom', path: ['corrections'], message: 'Correction IDs must be unique.' });
   }
@@ -88,7 +111,7 @@ export function validateReportForRequest(value: unknown, request: AnalysisReques
   if (report.clipId !== request.clipId || report.exerciseId !== request.exerciseId || report.durationSec !== request.durationSec) {
     throw new Error('Report does not belong to this clip.');
   }
-  for (const correction of report.corrections) {
+  for (const correction of [...report.corrections, ...(report.formChecks ?? [])]) {
     for (const evidence of correction.evidence) {
       const frame = request.frames[evidence.frameIndex];
       if (!frame || Math.abs(frame.timestampSec - evidence.timestampSec) > 0.05) {

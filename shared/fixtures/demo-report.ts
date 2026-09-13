@@ -11,6 +11,13 @@ export const demoReport = AnalysisReportSchema.parse({
   summary: 'Sample report for interface development. These observations are fictional, not findings about your video.',
   visibility: { assessable: true, limitations: ['Synthetic fixture: no real clip was analysed.'] },
   targetMuscles: ['Biceps brachii', 'Brachialis'],
+  formChecks: [
+    { criterionId: 'steady_upper_arm', status: 'needs_attention', note: 'Example: your upper arm moves forward as you lift.', evidence: [{ frameIndex: 0, timestampSec: 0 }, { frameIndex: 4, timestampSec: 4 }] },
+    { criterionId: 'neutral_wrist', status: 'looks_consistent', note: 'Example: your wrist stays aligned with your forearm at 4s.', evidence: [{ frameIndex: 4, timestampSec: 4 }] },
+    { criterionId: 'steady_torso', status: 'needs_attention', note: 'Example: your torso leans back near the top of the curl.', evidence: [{ frameIndex: 4, timestampSec: 4 }, { frameIndex: 8, timestampSec: 8 }] },
+    { criterionId: 'relaxed_shoulders', status: 'looks_consistent', note: 'Example: your shoulders stay relaxed at these moments.', evidence: [{ frameIndex: 4, timestampSec: 4 }, { frameIndex: 8, timestampSec: 8 }] },
+    { criterionId: 'controlled_movement', status: 'unclear', note: 'Example: movement control isn’t clear enough to assess in this video.', evidence: [] },
+  ],
   corrections: [
     {
       id: 'correction-1', title: 'Example: upper-arm movement', priority: 'focus_first',

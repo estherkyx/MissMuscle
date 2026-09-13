@@ -18,17 +18,20 @@ dumbbell front squat (quadriceps and glutes) have reference sheets only. Each sh
 includes an original schematic, muscle guide, and linked technique sources.
 Selecting a reference-only exercise clears old findings and disables upload and
 analysis. The server contract remains curl-only. Video is the main review surface
-for curls; correction rows below it seek to evidence, compact voice controls sit
-beside the video actions, and form/muscle references live at the bottom.
+for curls; correction rows below it expand in place, with explicit buttons to seek to evidence, compact voice controls sit
+beside the video actions, and a Reference Sheet button opens a combined form and muscle guide.
+New curl analyses include a compact AI form checklist: looks consistent, needs
+attention, or unclear, with expandable timestamp evidence. The reference popup includes technique details and learning links. Older reports need reanalysis to populate the checklist.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open http://localhost:5173 and select **Explore a sample report**. No API key is
-needed. The sample is fictional and visibly labelled. API requests use the same
-origin as the interface. Changes to `server/` reload during local development.
+Open http://localhost:5173, select an exercise, and open **Reference Sheet** without
+an API key. Analyzing a curl video requires the configured server key. The public
+interface has no sample mode; fixtures remain in development tests and the voice
+harness only. API requests use the same origin as the interface. Changes to `server/` reload during local development.
 
 Use Node 22.12+ (the `.nvmrc` selects Node 22). Person B can copy `.env.example` to
 `.env` and set `OPENAI_API_KEY` locally to use the providers. Restart the

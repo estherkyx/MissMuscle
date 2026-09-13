@@ -19,7 +19,7 @@ const request = AnalysisRequestSchema.parse({
 });
 try {
   const report = await analyzeClip(request, env);
-  console.log(JSON.stringify({ source: report.source, assessable: report.visibility.assessable, correctionCount: report.corrections.length, summary: report.summary }, null, 2));
+  console.log(JSON.stringify({ source: report.source, assessable: report.visibility.assessable, correctionCount: report.corrections.length, formChecks: report.formChecks?.map(({ criterionId, status }) => ({ criterionId, status })), summary: report.summary }, null, 2));
 } catch (error) {
   if (error instanceof ServiceError) console.error(`${error.code}: ${error.message}`);
   else console.error('Analysis smoke test failed.');

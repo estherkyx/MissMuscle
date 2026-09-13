@@ -53,6 +53,22 @@ frames. The app does not promise to detect movements between sampled frames.
 corrections, and next-attempt focus. Each correction has a stable ID, priority,
 observation, coaching cue, reference cue, and at least one evidence frame.
 
+Additive handoff for Person A: new analyses also return `formChecks`, containing
+exactly one entry for each of the five IDs in `shared/curl-reference.ts`. Each has
+`criterionId`, `status` (`looks_consistent`, `needs_attention`, or `unclear`), a short
+`note`, and `evidence: [{ frameIndex, timestampSec }]`. The server derives times
+from the submitted video and validates them. Assessed checks require two distinct
+moments, except a visible static wrist check may use one. An unassessable clip must
+have all checks unclear. These checks describe visible evidence, not a safety grade.
+The field is optional only for compatibility with old reports; missing checks
+render as unclear, never as passes. New provider responses must include all five.
+
+User-facing observations and voice use seconds, not frame numbers. Sampling
+limitations should be concise uncertainty statements, not requests for users to
+upload images. The review UI places expandable checklist rows beneath corrections;
+their timestamp buttons use the existing `seek_video` command. Correction cards expand in place; only explicit timestamp buttons seek. The Reference
+Sheet button opens a modal with combined technique and anatomy guidance.
+
 - `source: fixture` is synthetic sample content. Never attach it to uploaded
   footage as real findings or silently use it after a failed provider request.
 - `source: astra` means a real analysis result, not a guarantee of accuracy.
