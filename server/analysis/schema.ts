@@ -14,7 +14,7 @@ export const AnalysisDraftSchema = z.object({
     status: FormStatusSchema,
     note: z.string().min(1).max(250),
     evidence: z.array(z.object({ frameIndex: z.number().int().min(0).max(15) })).max(4),
-  })).length(5),
+  })).min(3).max(5),
   corrections: z.array(z.object({
     title: z.string().min(1).max(100),
     priority: z.enum(['focus_first', 'practice_next']),

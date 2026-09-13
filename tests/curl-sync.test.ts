@@ -14,15 +14,15 @@ function pose(degrees: number): Landmark[] {
 test('reference follows phase at different speeds, holds, and reverses on lowering', () => {
   for (const step of [0.08, 0.3]) {
     const tracker = createCurlSync();
-    const low = tracker.update([pose(15)], 300, 400, 0)!;
-    const middle = tracker.update([pose(77.5)], 300, 400, step)!;
+    const low = tracker.update([pose(5)], 300, 400, 0)!;
+    const middle = tracker.update([pose(72.5)], 300, 400, step)!;
     const high = tracker.update([pose(140)], 300, 400, step*2)!;
     assert.ok(Math.abs(low.progress) < 1e-6);
-    assert.ok(Math.abs(middle.progress-0.25) < 1e-6);
-    assert.ok(Math.abs(high.progress-0.5) < 1e-6);
+    assert.ok(Math.abs(middle.progress-0.5) < 1e-6);
+    assert.ok(Math.abs(high.progress-1) < 1e-6);
     assert.equal(middle.direction, 'Lifting');
     assert.equal(tracker.update([pose(140)], 300, 400, step*3)!.direction, 'Holding');
-    assert.equal(tracker.update([pose(77.5)], 300, 400, step*4)!.direction, 'Lowering');
+    assert.equal(tracker.update([pose(72.5)], 300, 400, step*4)!.direction, 'Lowering');
   }
 });
 test('missing, ambiguous and collapsed arms never advance a reference; seek resets direction', () => {
@@ -35,5 +35,5 @@ test('missing, ambiguous and collapsed arms never advance a reference; seek rese
   const collapsed = pose(50); collapsed[15] = collapsed[13];
   assert.equal(tracker.update([collapsed], 300, 400, 4.4), null);
   tracker.reset();
-  assert.equal(tracker.update([pose(15)], 300, 400, 0)!.direction, 'Holding');
+  assert.equal(tracker.update([pose(5)], 300, 400, 0)!.direction, 'Holding');
 });

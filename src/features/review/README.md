@@ -1,13 +1,37 @@
 # Person A: sourced curl comparison and review
 
+## Full-range demonstration review
+
+All four supported variations use the same source-review standard. The reference
+sheet and animated reference now share `referenceSpatialPose` geometry, including
+their start and finish positions. These are original schematics informed by the
+sources below; source photos or videos are not copied into the product.
+
+| Variation | Source and authored visual criteria |
+| --- | --- |
+| Standing palms-up dumbbell curl | [Mayo Clinic video and transcript](https://www.mayoclinic.org/healthy-lifestyle/fitness/multimedia/biceps-curl/vid-20084675): steady upper arm, aligned wrist, controlled curl and return. The schematic moves from a nearly extended arm to a clearly bent elbow. |
+| Seated overhand front lat pulldown | [ACE guidance](https://www.acefitness.org/resources/everyone/exercise-library/158/seated-lat-pulldown/) and [Life Fitness illustrated chart](https://www.lifefitness.com.au/wp-content/uploads/2015/02/GS4-Wall-chart.pdf): extended overhead arms, fixed grip, bar toward the upper chest, elbows down beside the torso, stable small lean. Two-bone arm geometry keeps limb lengths and hand spacing constant. |
+| Seated machine leg extension | [Life Fitness illustrated chart](https://www.lifefitness.com.au/wp-content/uploads/2015/02/GS4-Wall-chart.pdf) and [Optima setup manual](https://www.lifefitness.com.au/wp-content/uploads/2015/02/Optima_user_manual_for_all_strength_2_585_1371787541.pdf#page=18): supported thighs/back, knee pivot alignment, lower-shin roller and near-straight extension without forcing the knee. The authored endpoint is three degrees short of straight. |
+| Two-dumbbell front squat | [NASM instructions and linked demonstration](https://www.nasm.org/resource-center/exercise-library/dumbbell-front-squat): weights close to shoulders, grounded feet, coordinated hip/knee bend, approximately parallel thighs and a return to standing. |
+
+Review date: 2026-09-13. Authored dimensions and endpoints are illustration choices,
+not measured anatomy, mandatory personal ranges or new grading thresholds.
+The existing shared exercise criteria remain the analysis source of truth.
+Online research belongs to reference maintenance, not runtime analysis requests.
+
+Before adding another exercise, review source visuals for its exact variation,
+check start/midpoint/finish/return, preserve limb lengths and equipment contact,
+and verify static/animated agreement at front, side and three-quarter angles.
+Use the common full-range timing pipeline described in the
+[video handoff](../video/README.md#full-range-references-for-all-supported-exercises).
+
 ## Exercise library update
 
-`exercise-library.ts` is a browser-side catalogue. It adds lat pulldown, seated
-leg extension, and dumbbell front squat without adding any new analysis models,
-request exercise IDs, or provider routes. `ExerciseDiagrams.tsx` supplies original
-schematics and approximate muscle-location diagrams. Exercise changes
-reset the active clip/report, and reference-only selections do not expose analysis
-or voice controls. Returning to dumbbell curl restores the existing analysis flow.
+`exercise-library.ts` re-exports the shared catalogue. All four listed variations
+support analysis and voice. The UI and provider use the same versioned criteria;
+see [the multi-exercise handoff](../../../docs/EXERCISES.md).
+`ExerciseDiagrams.tsx` supplies original schematics and muscle-location diagrams.
+Exercise changes reset the active clip, report, tracking and voice session.
 
 Targets are lats for pulldowns, quadriceps for leg extensions, and quadriceps and
 glutes for the front squat. The squat reference specifies two dumbbells held at

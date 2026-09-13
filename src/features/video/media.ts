@@ -1,4 +1,4 @@
-import { AnalysisRequestSchema, LIMITS, type AnalysisRequest } from '../../../shared/contracts';
+import { AnalysisRequestSchema, LIMITS, type AnalysisRequest, type ExerciseId } from '../../../shared/contracts';
 
 export interface LocalClip {
   id: string;
@@ -91,7 +91,7 @@ export function validatePayload(request: AnalysisRequest) {
   return parsed;
 }
 
-export async function extractFrames(clip: LocalClip, signal: AbortSignal, onProgress: (count: number) => void): Promise<AnalysisRequest> {
+export async function extractFrames(clip: LocalClip, exerciseId: ExerciseId, signal: AbortSignal, onProgress: (count: number) => void): Promise<AnalysisRequest> {
   const video = createVideo();
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
@@ -125,6 +125,6 @@ export async function extractFrames(clip: LocalClip, signal: AbortSignal, onProg
       frames.push({ timestampSec: video.currentTime, dataUrl, width: canvas.width, height: canvas.height });
       onProgress(frames.length);
     }
-    return validatePayload({ clipId: clip.id, exerciseId: 'dumbbell_curl', durationSec: clip.durationSec, frames });
+    return validatePayload({ clipId: clip.id, exerciseId, durationSec: clip.durationSec, frames });
   } finally { releaseVideo(video); canvas.width = 0; canvas.height = 0; }
 }

@@ -12,16 +12,16 @@ The **video/review interface, Astra analysis service, and GPT-Live voice adapter
 are integrated locally**. Real exercise-flow acceptance and Sites deployment remain.
 See [current verification and next steps](docs/PERSON_B_STATUS.md).
 
-The interface starts with an exercise selector. Dumbbell curl
-(biceps) supports analysis. Lat pulldown (lats), leg extension (quadriceps), and
-dumbbell front squat (quadriceps and glutes) have reference sheets only. Each sheet
-includes an original schematic, muscle guide, and linked technique sources.
-Selecting a reference-only exercise clears old findings and disables upload and
-analysis. The server contract remains curl-only. Video is the main review surface
-for curls; correction rows below it expand in place, with explicit buttons to seek to evidence, compact voice controls sit
-beside the video actions, and a Reference Sheet button opens a combined form and muscle guide.
-New curl analyses include a compact AI form checklist: looks consistent, needs
-attention, or unclear, with expandable timestamp evidence. The reference popup includes technique details and learning links. Older reports need reanalysis to populate the checklist.
+The exercise selector supports dumbbell curl, seated overhand front lat pulldown,
+seated machine leg extension, and two-dumbbell front squat. All four support
+upload, exercise-specific Astra analysis, evidence playback, voice discussion,
+and educational body mapping with synchronized reference illustrations.
+Changing exercises clears the previous clip, findings, and voice session.
+See the
+[multi-exercise handoff](docs/EXERCISES.md) for criteria, motion limitations, and validation.
+Video remains the main review surface; correction rows seek to submitted-frame
+evidence, with voice controls beside the actions and a Reference Sheet dialog.
+New analyses include an exercise-specific form checklist with timestamp evidence.
 
 ```sh
 npm ci
@@ -90,7 +90,7 @@ wait until the last hour for the first integration.
 
 Required:
 
-- One exercise: dumbbell curl, with a prescribed camera view.
+- Four named exercise variations, each with its own camera guidance and rubric.
 - One prerecorded clip at a time, ideally 5–15 seconds; 15-second/40 MiB caps.
 - 12–16 ordered JPEG frames, longest edge <= 768 px. The schema permits 2–16 so
   short test sequences and adaptive frame selection can use the same contract.
@@ -100,8 +100,7 @@ Required:
 - GPT-Live dialogue grounded in the report, with interruption and playback actions.
 - A working Sites URL and an honest video demo of the implemented features.
 
-Stretch only after the complete flow works: a second-attempt comparison or a second
-exercise. Defer continuous camera analysis, tracking muscles on every frame, 3D
+Stretch only after the complete flow works: a second-attempt comparison or more exercise variations. Defer continuous camera analysis, tracking muscles on every frame, 3D
 reconstruction, workout history/accounts, arbitrary gym machines, and image generation.
 
 ## What is implemented here
@@ -112,8 +111,8 @@ reconstruction, workout history/accounts, arbitrary gym machines, and image gene
 - Typed analysis client, voice interface, and typed playback commands.
 - API errors and payload limits; contract and route tests.
 - Separate browser and server production bundles.
-- Real Astra image analysis with strict structured output, a conservative curl
-  rubric, and server-derived evidence timestamps.
+- Real Astra image analysis with strict structured output, conservative exercise-specific
+  rubrics, and server-derived evidence timestamps.
 - Real GPT-Live WebRTC audio with report-grounded delegation to Astra, validated
   playback commands, context updates, and graceful session shutdown.
 - An isolated [voice test page](src/features/voice/dev.html), served by the dev

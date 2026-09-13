@@ -22,10 +22,10 @@ export function createCurlSync() {
       const length = Math.hypot(ax, ay)*Math.hypot(bx, by);
       if (Math.min(Math.hypot(ax, ay), Math.hypot(bx, by)) < Math.min(width, height)*0.025) { previous = undefined; return null; }
       const bend = Math.PI - Math.acos(Math.max(-1, Math.min(1, (ax*bx+ay*by)/length)));
-      const lift = Math.max(0, Math.min(1, (bend*180/Math.PI-15)/125));
+      const lift = Math.max(0, Math.min(1, (bend*180/Math.PI-5)/135));
       const delta = previous && time > previous.time && time-previous.time < 0.5 ? bend-previous.bend : 0;
       previous = { bend, time };
-      return { progress: Math.acos(1-2*lift)/(2*Math.PI), time, direction: Math.abs(delta) < 0.015 ? 'Holding' : delta > 0 ? 'Lifting' : 'Lowering' };
+      return { progress: lift, time, direction: Math.abs(delta) < 0.015 ? 'Holding' : delta > 0 ? 'Lifting' : 'Lowering' };
     },
   };
 }

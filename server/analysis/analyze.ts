@@ -3,11 +3,13 @@ import type { Env } from '../env';
 import { ServiceError } from '../errors';
 import { openaiPost, requireApiKey } from '../openai';
 import { AnalysisDraftSchema, analysisJsonSchema, ResponseEnvelopeSchema } from './schema';
-import { ANALYSIS_INSTRUCTIONS, CURL_TARGET_MUSCLES } from './rubric';
+import { buildAnalysisInstructions } from './rubric';
+import { getExercise } from '../../shared/exercises';
 import { videoFeedback } from '../../shared/video-feedback';
 
 export async function analyzeClip(request: AnalysisRequest, env: Env): Promise<AnalysisReport> {
   requireApiKey(env);
+  const exercise = getExercise(request.exerciseId)!;
   // Reject obviously malformed bytes before paying for provider decoding.
   // OpenAI still performs actual image decoding; this is not a complete JPEG decoder.
   for (const frame of request.frames) {
@@ -20,7 +22,7 @@ export async function analyzeClip(request: AnalysisRequest, env: Env): Promise<A
   }
   const content: Array<Record<string, unknown>> = [{
     type: 'input_text',
-    text: `Exercise: conventional dumbbell curl. Duration: ${request.durationSec}s. There are ${request.frames.length} ordered frames. Only indices 0 through ${request.frames.length - 1} exist.`,
+    text: `Exercise: ${exercise.label}; variation: ${exercise.variation}. Duration: ${request.durationSec}s. There are ${request.frames.length} ordered frames. Only indices 0 through ${request.frames.length - 1} exist.`,
   }];
   request.frames.forEach((frame, index) => content.push(
     { type: 'input_text', text: `Frame ${index}; timestamp ${frame.timestampSec}s; image ${frame.width}x${frame.height}.` },
@@ -28,7 +30,7 @@ export async function analyzeClip(request: AnalysisRequest, env: Env): Promise<A
   ));
   const raw = await openaiPost('/responses', {
     model: env.ASTRA_MODEL || 'gpt-6-astra',
-    instructions: ANALYSIS_INSTRUCTIONS,
+    instructions: buildAnalysisInstructions(request.exerciseId),
     input: [{ role: 'user', content }],
     reasoning: { effort: 'low' },
     max_output_tokens: 6000,
@@ -47,7 +49,7 @@ export async function analyzeClip(request: AnalysisRequest, env: Env): Promise<A
     const report = {
       ...draft, schemaVersion: '1', id: crypto.randomUUID(), clipId: request.clipId,
       exerciseId: request.exerciseId, durationSec: request.durationSec, source: 'astra',
-      targetMuscles: CURL_TARGET_MUSCLES,
+      targetMuscles: exercise.targetMuscles,
       summary: cleanText(draft.summary),
       nextAttemptFocus: cleanText(draft.nextAttemptFocus),
       visibility: { ...draft.visibility, limitations: [...new Set(draft.visibility.limitations.map(cleanText))] },

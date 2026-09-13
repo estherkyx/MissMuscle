@@ -1,5 +1,9 @@
 # Person A: video and playback handoff
 
+Multi-exercise update: [exercise handoff](../../../docs/EXERCISES.md). The player
+passes an explicit exercise ID into extraction, body mapping and reference motion.
+Curl-specific descriptions below document the original implementation.
+
 The implementation is composed by [App](../../App.tsx), using the unchanged
 [shared contract](../../../shared/contracts.ts) and [analysis client](../../lib/api.ts).
 Person B's server and voice adapter remain separately owned. The moving muscle
@@ -9,7 +13,7 @@ the lockfile is updated. Shared contracts and package scripts are unchanged.
 ## Synchronized body map
 
 [MuscleOverlay](MuscleOverlay.tsx) now renders a separate body-map canvas beside
-original footage. Choose **Start body mapping**, then use the original video
+original footage. Choose **Start body mapping**, wait for preparation, then use the original video
 controls to play, pause, or seek both views. [mapped-body.ts](mapped-body.ts)
 draws a 2D joint-driven illustration on a dark grid, with red upper-arm target
 areas, yellow supporting forearm areas, and gray other areas. The matching
@@ -18,18 +22,35 @@ These are fixed educational curl categories, not measured activation, intensity,
 muscle segmentation, a 3D reconstruction, or a generated/exportable video file.
 
 Inference uses the existing pinned MediaPipe dependency and downloaded WASM/model.
-Video inference stays local. Multiple people suppress the map; missing/low-visibility
-joints suppress their connected segments. Seeking and resizing clear the old pose.
-Detection runs at most about 12 times per second, so the map can lag playback on
-slower devices. Pausing retains the latest detection, and backward seeks trigger
-fresh inference. Stop mapping, replace the clip, or unmount to release the tracker.
+Video inference stays local and uses MediaPipe VIDEO tracking. Multiple people
+clear the map. [The pose filter](pose-filter.ts) accepts finite, in-frame joints
+with visibility at least 0.75, smooths movement, and rejects isolated jumps;
+two consistent detections can reacquire a displaced joint. Missing joints retain
+their last reliable position for 150 ms of clip time, then fade out by 350 ms.
+These retained joints are dashed, excluded from reference movement and target
+colors, and never replaced with authored limbs.
+
+Framing uses the video's fixed contain rectangle, so a wandering joint cannot
+resize the body. Thickness is calibrated from reliable torso joints, not changing
+shoulder width. Preparation samples the clip at 10 Hz with a separate video, then
+releases its detector. Playback interpolates accepted adjacent cached joints.
+Pausing freezes the map and fade timers; seeking reads the same cached timeline.
+Resizing only redraws. Stop mapping, replace the clip, or unmount to cancel scanning
+and discard cached data. Model load failures remain explicit.
+
+Regression coverage in [pose-filter.test.ts](pose-filter.test.ts) checks jitter,
+outliers, reacquisition, fading, resets, uncertainty across all four exercises,
+and fixed portrait/landscape framing. `npm run check` passes. Real-clip visual
+acceptance remains pending: check fast repetitions, occlusion, pause, forward and
+backward seeks, resizing, and clip replacement for each exercise. No local test
+clip was available for this stabilization change.
 Native video fullscreen and picture-in-picture show only the source footage.
 No shared contract, voice interface, or dependency changes are needed for this view.
 
 ## Upload and extraction
 
 [media.ts](media.ts) exports `loadLocalClip(file, signal)` and
-`extractFrames(clip, signal, onProgress): Promise<AnalysisRequest>`.
+`extractFrames(clip, exerciseId, signal, onProgress): Promise<AnalysisRequest>`.
 
 - One local clip: greater than zero and at most 15 seconds, at most 40 MiB.
 - A new `clipId` is generated on every successful upload. The browser checks actual
@@ -133,22 +154,63 @@ Synthetic test responses are confined to the local QA harness, never app fallbac
 
 ## Third view: reference form
 
-[ReferenceMotion](ReferenceMotion.tsx) reuses [the body-map renderer](mapped-body.ts)
-with an [authored curl pose](reference-pose.ts). It starts paused, with independent
-play/pause and scrub controls. This is an educational demonstration using the
-existing [curl rubric](../review/curl-reference.ts), not a corrected user pose.
-Shoulders, upper arms and torso stay fixed while the forearms lift and lower with
-aligned wrists. Timing is illustrative, not a prescribed cadence. The reference
-wraps below the original/body-map pair on narrow screens. No shared interfaces
-or dependencies change.
+[ReferenceMotion](ReferenceMotion.tsx) renders [authored spatial exercise poses](reference-spatial.ts)
+using movement phase from the same tracked frames as the body map. The original
+video controls play, pause and seek all three views; there is no independent clock.
+[Reference facing](reference-view.ts) estimates horizontal body rotation from
+reliable shoulder and hip world landmarks. It follows front, rear, side and
+three-quarter views without copying observed torso lean or form errors.
 
-## Movement-synchronized reference
+Rotation is prepared with clip-time smoothing and holds the last reliable estimate
+for at most 0.35 seconds. Seeking reads the cached estimate; clip/exercise changes
+or mapping restart discard it.
+Conflicting torso directions or missing landmarks produce an explicit facing
+unavailable state once the hold expires. Multiple people clear the estimate.
+Facing remains approximate; no measured angle or reconstructed anatomy is claimed.
 
-The third panel now consumes the same detected frame as the body map via
-[curl-sync.ts](curl-sync.ts). It follows projected elbow bend rather than a fixed
-animation clock: video pause, speed changes and seeking govern all three views.
-A visible shoulder/elbow/wrist chain is selected and retained until mapping resets.
-Missing landmarks or multiple people hide the reference, with no independent loop
-or sample fallback. Seeking resets direction history. Torso and upper-arm reference
-positions remain authored. Camera projection and partial range can affect timing;
-this is approximate phase matching, not measured anatomical speed or a prescription.
+The [reference renderer](reference-renderer.ts) projects body and equipment through
+the same rotation with fixed 3:4 framing, drawing farther geometry first.
+The reference waits when tracking is disabled or movement joints are unavailable.
+The 2D pose helpers and reference-sheet endpoints project the same spatial poses.
+No server or shared interface changes are required.
+
+Validation: npm run check covers tests, TypeScript, client and server builds.
+Orientation tests cover cardinal/oblique angles, mirroring, aspect ratios,
+wraparound, tracking loss, resets, constant 3D segment lengths and canvas bounds.
+Real-clip visual acceptance remains separate from these synthetic checks.
+
+## Full-range references for all supported exercises
+
+[Reference scan](reference-scan.ts) prepares a browser-local, 10 Hz timeline. It pauses
+the visible player without seeking it, reports progress and supports cancellation.
+[Reference timeline](reference-timeline.ts) detects bounded movements independently
+of their observed amplitude, then maps each movement to the complete authored range.
+Curls, pulldowns, leg extensions and front squats all use progress 0 for the start
+and 1 for the opposite endpoint, reversing on return.
+
+Timing uses a three-sample median, six-degree reversal hysteresis, 0.25-second
+minimum movement intervals and 0.2-second holds (0.5-degree plateau tolerance).
+These are illustration timing settings, never analysis thresholds. Side selection
+locks for the scan. Occlusion, multiple people, missing samples and unbounded clip
+edges interrupt reference motion; stationary footage does not create a repetition.
+Body mapping remains observed movement, not the target pose. Interpolation and
+facing are approximate. The cache is local to one mounted clip/exercise and is
+cleared on replacement, stop or unmount; no footage is persisted or uploaded by it.
+
+[Authored geometry](reference-spatial.ts) supplies both the animated reference and
+the reference-sheet endpoints. [Source review](../review/README.md#full-range-demonstration-review)
+records the selected variants and visual criteria. Any future exercise must supply
+a source-reviewed start, endpoint, return and timing signal before release.
+
+Tests cover full/partial reps, tempo, holds, uncertain edges, cancellation, scan
+failures, deterministic seeking, fixed limb lengths and equipment attachment.
+Real exercise footage is still needed to evaluate repetition detection accuracy;
+synthetic geometry and browser layout checks do not establish that accuracy.
+
+Verification on 2026-09-13: `npm run check` passed 92 tests, TypeScript and both
+builds. Headless Chrome rendered all four references at start/midpoint/finish
+from four angles, and all reference sheets at 1440 px and 390 px without horizontal
+overflow. A real browser detector scan on labelled synthetic stationary footage
+produced no invented repetition; repeated seeks returned identical body-map pixels
+and stopping mapping succeeded. The local harness supplied the known three-second
+duration for its streaming WebM fixture; it did not mock the pose detector.
