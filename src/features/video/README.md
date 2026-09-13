@@ -90,8 +90,8 @@ node --import tsx --test src/features/video/video.test.ts src/features/review/co
 npm run check
 ```
 
-The first command is explicit because the shared `npm test` script only discovers
-root `tests/*.test.ts`. Feature tests cover limits, sampling, scaling, wait cleanup,
+The first command runs only the original feature checks; integrated `npm test`
+now includes these files as well as the root tests. Feature tests cover limits, sampling, scaling, wait cleanup,
 command rejection, click/voice parity, replay cancellation, and late voice lifecycle.
 
 Browser acceptance: upload portrait and landscape clips, inspect submitted JPEGs,

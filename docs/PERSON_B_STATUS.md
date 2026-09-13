@@ -2,6 +2,22 @@
 
 Updated 13 September 2026. Working branch: `agent-integration`.
 
+## Integration update
+
+Person A's `video-visual` work was already merged into remote `main` at `181c75e`.
+That commit is now merged into this branch without Git conflicts, preserving
+Person B's implementation in `0704835`. The main app now wires uploads, frame
+extraction, real analysis, evidence playback, and voice together. Integration fixes
+preserve transcript fragments, forward voice errors/cancellation, and share the
+versioned curl reference between the UI and analysis. All 45 tests are included
+in `npm run check`. These commits are local; no integration push or deployment
+has been performed.
+
+Open the running main app at http://127.0.0.1:5174/ to test the combined flow.
+Use Review my clip, choose a short curl recording, Analyze clip, select a correction,
+then start voice and ask to show the evidence. Real clip accuracy and browser
+audio/playback acceptance still need checking after this merge.
+
 ## Implemented
 
 - `POST /api/analyze`: real `gpt-6-astra` Responses request with ordered images,
@@ -19,8 +35,8 @@ Updated 13 September 2026. Working branch: `agent-integration`.
   main app or ship as a production page in the current Vite build.
 
 No dependencies were added. `shared/contracts.ts` and `src/lib/api.ts` are
-unchanged. The additive `shared/coach-config.ts` is needed by both server and voice
-code. `CoachOptions` adds optional `onError` and `signal` fields.
+unchanged. The additive shared coach configuration and curl reference are needed
+by both workstreams. `CoachOptions` adds optional `onError` and `signal` fields.
 
 ## Evidence so far
 
@@ -29,9 +45,9 @@ code. `CoachOptions` adds optional `onError` and `signal` fields.
 | Official model-access requests | HTTP 200 for both `gpt-6-astra` and `gpt-live-1` |
 | Real Astra image request | Passed with a generated blank image; `source: astra`, unassessable, zero corrections |
 | Real browser voice test | User reported the requested voice/second-correction harness test works |
-| Automated checks | 29 tests cover contracts, routes, provider mapping, evidence integrity, delegated commands, and browser teardown; TypeScript and production build pass |
+| Automated checks | 45 tests cover both workstreams and integration; TypeScript and production build pass |
 | Real exercise sequence accuracy | Pending testing with Person A's frame extractor and actual footage |
-| Real video seeking/highlights from voice | Pending integration; the harness only updates simulated playback state |
+| Real video seeking/highlights from voice | Wired into the main app; real browser acceptance after merge pending |
 | Final microphone/usage confirmation in a real browser | Verify End reaches idle and the microphone indicator disappears; teardown logic also has controlled tests |
 | ChatGPT Sites | Not created or deployed; packaging/runtime compatibility remains unverified |
 
@@ -42,7 +58,7 @@ fictional, clearly labelled, and never presented as analysis of uploaded footage
 ## Do next — Person B
 
 1. End the current harness session and check the microphone indicator disappears.
-2. Give Person A the handoff below and integrate their video/review work early.
+2. Test the integrated main app with Person A; the handoff below describes the interfaces already connected.
 3. Record permissioned 5–15 second dumbbell-curl clips with the arm, wrist, torso,
    and dumbbell clearly visible. Use an ordinary comfortable load. Keep originals
    in ignored `demo-private/`; do not stage personal footage or `.env`.
@@ -66,9 +82,8 @@ fictional, clearly labelled, and never presented as analysis of uploaded footage
 > `docs/CONTRACT.md`; a working standalone caller is
 > `src/features/voice/voice-harness.tsx`.
 
-Before the teammate can fetch this work, commit and push the local changes using
-the team's normal Git workflow. The presence of a local branch is not a remote
-handoff. Run `npm run check` after merging both workstreams.
+Before the teammate can fetch this integration, push the local commits using the
+team's normal Git workflow. The presence of a local branch is not a remote handoff.
 
 ## Local checks
 

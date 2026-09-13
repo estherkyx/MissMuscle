@@ -52,9 +52,11 @@ the observation. A correction-specific source mapping requires an agreed criteri
 
 ## Coordination handoff for Person B
 
-No shared files or package files were changed, and no teammate integration is claimed.
-The reference record is intentionally staged in Person A's directory until the two
-owners agree to its shared location and semantics. Person B should:
+Integration update: the reference is now in `shared/curl-reference.ts`, with the
+original import path re-exported for compatibility. The Astra prompt uses this
+same reference. The main app uses the real voice adapter, forwards error and
+cancellation callbacks, and appends its transcript fragments. The original
+coordination requirements below remain useful for further changes:
 
 1. Review/agree `curlReference` and coordinate promotion to a shared browser-safe
    module. Both prompt and visual UI must use the same reference version.
@@ -70,9 +72,8 @@ owners agree to its shared location and semantics. Person B should:
 5. Ground voice in the resulting report and reference standard. Keep provider events
    within the owned voice adapter; use the [playback handoff](../video/README.md).
 
-The current analysis service/voice adapter are still stubs. This work implements
-the comparison UI and sourced rubric; it does not claim the backend already applies
-the rubric or that detection accuracy has been established.
+The analysis service and voice adapter are implemented and integrated. Detection
+accuracy on real exercise clips still needs joint testing.
 
 ## Joint accuracy acceptance
 

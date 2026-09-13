@@ -8,8 +8,8 @@ that”** → the coach brings up the relevant moment and explains the evidence.
 
 ## Start here
 
-The **Astra analysis service and GPT-Live voice adapter are implemented**. The main
-video/review interface and Sites deployment still need integration with Person A.
+The **video/review interface, Astra analysis service, and GPT-Live voice adapter
+are integrated locally**. Real exercise-flow acceptance and Sites deployment remain.
 See [current verification and next steps](docs/PERSON_B_STATUS.md).
 
 ```sh
@@ -108,9 +108,9 @@ reconstruction, workout history/accounts, arbitrary gym machines, and image gene
   server at `/src/features/voice/dev.html`; it uses real voice and a labelled
   fictional report unless you import a real one.
 
-What remains in this checkout: Person A's video upload/extraction, visual review
-and reference assets, testing the combined flow on actual exercise clips, and
-Sites deployment. Comparison is optional. Missing keys or provider failures return
+The app now includes video upload/frame extraction, evidence review, reference
+illustrations, and voice controls. What remains is testing the combined flow on
+actual exercise clips and Sites deployment. Comparison is optional. Missing keys or provider failures return
 explicit errors; they never produce a sample report as a fallback.
 
 ## Structure
@@ -132,6 +132,7 @@ server/
 shared/
   contracts.ts               Shared: single source of truth for interfaces
   coach-config.ts            Shared: voice instructions and playback tool definitions
+  curl-reference.ts          Shared: versioned curl criteria for analysis and UI
   fixtures/demo-report.ts    Explicit synthetic UI fixture
 scripts/dev-api.ts           Local Node-to-Web Request adapter
 tests/                      Contract and HTTP boundary checks

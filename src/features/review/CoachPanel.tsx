@@ -2,6 +2,7 @@ import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'reac
 import type { CoachCommand, CoachContext } from '../../../shared/contracts';
 import { connectCoach, type CoachStatus } from '../voice/coach-client';
 import { createCoachSession } from './coach-session';
+import { appendTranscript, type TranscriptFragment } from './transcript';
 
 export interface CoachPanelHandle { stop(): Promise<void> }
 interface Props {
@@ -21,8 +22,7 @@ export function CoachPanel({ ref, context, onCommand }: Props) {
   const [busy, setBusy] = useState(false);
   const [active, setActive] = useState(false);
   const [error, setError] = useState('');
-  const [transcript, setTranscript] = useState<Array<{ role: 'user' | 'coach'; text: string }>>([]);
-  const [interim, setInterim] = useState<{ role: 'user' | 'coach'; text: string } | null>(null);
+  const [transcript, setTranscript] = useState<TranscriptFragment[]>([]);
 
   async function stop() {
     uiEpoch.current++;
@@ -33,7 +33,7 @@ export function CoachPanel({ ref, context, onCommand }: Props) {
       if (mounted.current) setError(e instanceof Error ? e.message : 'Could not finish ending the coach session.');
       throw e;
     } finally {
-      if (mounted.current) { setStatus(ended ? 'idle' : 'error'); setActive(!ended); setBusy(false); setInterim(null); }
+      if (mounted.current) { setStatus(ended ? 'idle' : 'error'); setActive(!ended); setBusy(false); }
     }
   }
   useImperativeHandle(ref, () => ({ stop }));
@@ -50,16 +50,17 @@ export function CoachPanel({ ref, context, onCommand }: Props) {
   async function start() {
     if (!latest.current.context || busy || active) return;
     const generation = ++uiEpoch.current;
-    setBusy(true); setStatus('connecting'); setError(''); setTranscript([]); setInterim(null);
+    setBusy(true); setStatus('connecting'); setError(''); setTranscript([]);
     try {
       await session.current!.start({
         context: latest.current.context,
         onCommand: command => latest.current.onCommand(command),
-        onStatus: setStatus,
-        onTranscript: entry => {
-          if (entry.final) { setTranscript(previous => [...previous, { role: entry.role, text: entry.text }].slice(-100)); setInterim(null); }
-          else setInterim(entry);
+        onStatus: next => {
+          setStatus(next);
+          if (next === 'idle' || next === 'error') setActive(false);
         },
+        onError: setError,
+        onTranscript: entry => setTranscript(previous => appendTranscript(previous, entry)),
       });
       if (mounted.current && generation === uiEpoch.current) setActive(true);
     } catch (e) {
@@ -79,7 +80,6 @@ export function CoachPanel({ ref, context, onCommand }: Props) {
     {error && <p role="alert" className="error">{error}</p>}
     <div className="transcript" role="log" aria-label="Coach conversation" aria-live="polite">
       {transcript.map((entry, index) => <p key={index}><strong>{entry.role === 'user' ? 'You' : 'Coach'}:</strong> {entry.text}</p>)}
-      {interim && <p className="muted"><strong>{interim.role === 'user' ? 'You' : 'Coach'}:</strong> {interim.text} <small>(speaking)</small></p>}
     </div>
   </section>;
 }
