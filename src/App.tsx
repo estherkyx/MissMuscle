@@ -189,7 +189,7 @@ export default function App() {
   const progressText = phase === 'loading' ? 'Preparing video…' : phase === 'extracting' ? `Preparing video… ${Math.round(progress / LIMITS.maxFrames * 100)}%` : phase === 'analyzing' ? 'Reviewing your form…' : '';
 
   return <main>
-    <header><a className="brand" href="/">MissMuscle<span>✳</span></a><span className="tag">A little guidance. A stronger next rep.</span></header>
+    <header><a className="brand" href="/" aria-label="MissMuscle home"><img src="/logo.png" alt="MissMuscle" width="1254" height="1254" /></a></header>
     <section className="intro"><p className="eyebrow">Your personal form coach</p><h1>Make your next rep <em>better.</em></h1></section>
     <div className="exercise-toolbar"><section className="exercise-setup" aria-label="Choose your exercise">
       <label><span className="field-label">Exercise</span><select value={exercise} disabled={working} onChange={event => void changeExercise(event.target.value)}>
